@@ -16,3 +16,5 @@ Changes needed for compilation:
 include RobotKinematics.* files into Movement/Kinematics folder
 
 Duet 2 compilation is critical with memory usage, disable all other kinematics in Pins.h to have a chance.
+
+For 6HC, the Hangprinter flag in Pins.h must be set.
