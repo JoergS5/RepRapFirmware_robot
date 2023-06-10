@@ -74,6 +74,12 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 			seen = true;
 		}
 
+		if (gb.Seen('C')) {
+			gb.TryGetQuotedString('C', inputValue.GetRef(), seen, allowEmpty);
+			setC(inputValue.c_str());
+			seen = true;
+		}
+
 		if(!seen) {
 		}
 
