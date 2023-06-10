@@ -9,8 +9,12 @@ Changes needed for compilation:
 - Kinematics.cpp add:
 
 #if SUPPORT_ROBOT
-	case KinematicsType::robot:
-		return new RobotKinematics();
+
+case KinematicsType::robot:
+(cas KinematicsType : : r o b o t without space : )
+
+return new RobotKinematics();
+
 #endif
 
 include RobotKinematics.* files into Movement/Kinematics folder
