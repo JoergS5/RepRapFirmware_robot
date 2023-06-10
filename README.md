@@ -10,13 +10,9 @@ Changes needed for compilation:
 - Kinematics.cpp add:
 
 #if SUPPORT_ROBOT
-
 case KinematicsType::robot:
-(cas KinematicsType : : r o b o t without space : )
-
-return new RobotKinematics();
-
 #endif
+
 github destroys the information, I attach Kinematics.cpp of RRF to github.
 
 include RobotKinematics.* files into Movement/Kinematics folder
