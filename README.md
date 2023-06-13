@@ -1,7 +1,7 @@
 # RepRapFirmware_robot
 only cpp, h and binaries
 
-based on RRF 3.5.0beta3. To compile, use all related projects which are tagged with this release number.
+based on RRF 3.5.0beta3 (next build will be based on beta4). To compile, use all related projects which are tagged with this release number.
 
 Changes needed for compilation:
 - Config/Pins.h add a SUPPORT_ROBOT flag and set to 1
