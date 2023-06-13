@@ -15,3 +15,5 @@ The changed Pins.h, Kinematics.h and .cpp are checked in.
 Duet 2 compilation is critical with memory usage, disable all other kinematics in Pins.h to have a chance.
 
 For 6HC, the Hangprinter flag in Pins.h must be set.
+
+For 3.5.0beta4, I needed to use RRFLibraries-RRF-and-Duet3Expansion-3.5.0-beta.4 instead of the old RRFLibraries, CoreN2G and name the project RRFLibraries.
