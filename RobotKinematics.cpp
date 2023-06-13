@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 10.06.2023
+ *  Created on: 13.06.2023
  *      Author: JoergS5
  */
 
@@ -169,13 +169,17 @@ bool RobotKinematics::QueryTerminateHomingMove(size_t axis) const noexcept {
 void RobotKinematics::OnHomingSwitchTriggered(size_t axis, bool highEnd,
 		const float stepsPerMm[], DDA& dda) const noexcept {
 
-	float home = cache[offsetAngleLimits + axis*3 + 2];
-	dda.SetDriveCoordinate(lrintf(home * stepsPerMm[axis]), axis);
-
-//	const float hitPoint = ((highEnd) ? reprap.GetPlatform().AxisMaximum(axis) :
-//			reprap.GetPlatform().AxisMinimum(axis));
-//	dda.SetDriveCoordinate(lrintf(hitPoint * stepsPerMm[axis]), axis);
-
+	char letter = forwardChainCompressed[axis];
+	int chainOrder = getPositionOfLetterInChain(letter);
+	if(chainOrder >= 0) { // A parameter for letter found
+		float home = cache[offsetAngleLimits + chainOrder*3 + 2];
+		dda.SetDriveCoordinate(lrintf(home * stepsPerMm[axis]), axis);
+	}
+	else { // try M208
+		const float hitPoint = ((highEnd) ? reprap.GetPlatform().AxisMaximum(axis) :
+				reprap.GetPlatform().AxisMinimum(axis));
+		dda.SetDriveCoordinate(lrintf(hitPoint * stepsPerMm[axis]), axis);
+	}
 }
 
 bool RobotKinematics::IsContinuousRotationAxis(size_t axis) const noexcept {
