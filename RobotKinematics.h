@@ -66,8 +66,8 @@ public:
 	mutable int numOfAxes = 5;
 	mutable float screw_M[12];
 	mutable float screw_MInv[12];
-	mutable float currentToolLength = 100;
-	mutable float toolDirection[3] = {0,0,1};
+//	mutable float currentToolLength = 100;
+//	mutable float toolDirection[3] = {0,0,1};
 
 	// special kinematics settings
 	mutable int specialMethod = 0;	// 1 CoreXY 2 CoreXZ 9 5barParScara 10 RotaryDelta 14 Palletized 15 LinearDelta
@@ -214,9 +214,9 @@ public:
 	}
 */
 	// forward
-	void getToolOffsets(float *offsets) const noexcept;
-	void getToolDirection(float *direction) const noexcept;
-	void checkAndChangeToolLength() const noexcept;
+	//void getToolOffsets(float *offsets) const noexcept;
+	//void getToolDirection(float *direction) const noexcept;
+	//void checkAndChangeToolLength() const noexcept;
 
 	void getForwardBySkew(const float *angles, float *mxTo) const noexcept;
 	void getForwardSpecialParts(const float *angles, int i, float *mxTo) const noexcept;
