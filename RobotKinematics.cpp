@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 13.06.2023
+ *  Created on: 23.07.2023
  *      Author: JoergS5
  */
 
@@ -53,34 +53,34 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 	if (mCode == 669)
 	{
 		bool seen = false;
-		String<50> inputValue;
 		bool allowEmpty = false;
 
 		if (gb.Seen('B')) {
-			gb.TryGetQuotedString('B', inputValue.GetRef(), seen, allowEmpty);
-			setB(inputValue.c_str());
+			gb.TryGetQuotedString('B', tempS50.GetRef(), seen, allowEmpty);
+			setB(tempS50.c_str());
 			seen = true;
 		}
 
 		if (gb.Seen('A')) {
-			gb.TryGetQuotedString('A', inputValue.GetRef(), seen, allowEmpty);
-			setA(inputValue.c_str());
+			gb.TryGetQuotedString('A', tempS50.GetRef(), seen, allowEmpty);
+			setA(tempS50.c_str());
 			seen = true;
 		}
 
 		if (gb.Seen('P')) {
-			gb.TryGetQuotedString('P', inputValue.GetRef(), seen, allowEmpty);
-			setP(inputValue.c_str());
+			gb.TryGetQuotedString('P', tempS50.GetRef(), seen, allowEmpty);
+			setP(tempS50.c_str());
 			seen = true;
 		}
 
 		if (gb.Seen('C')) {
-			gb.TryGetQuotedString('C', inputValue.GetRef(), seen, allowEmpty);
-			setC(inputValue.c_str());
+			gb.TryGetQuotedString('C', tempS50.GetRef(), seen, allowEmpty);
+			setC(tempS50.c_str());
 			seen = true;
 		}
 
 		if(!seen) {
+			reportConfiguration(gb);
 		}
 
 		return seen;
@@ -100,11 +100,18 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 	float anglesTo[numOfAxes];
 	getInverseBySkew(mx, anglesTo);
 
-	for(int i=0; i < numOfAxes; i++) {
-		motorPos[i] = lrintf(anglesTo[i] * stepsPerMm[i]);
+	for(int pos=0; pos < numOfAxes; pos++) {
+		char lett = getLetterInChain(pos);
+		if(lett == 'X') motorPos[0] = lrintf(anglesTo[pos] * stepsPerMm[0]);
+		if(lett == 'Y') motorPos[1] = lrintf(anglesTo[pos] * stepsPerMm[1]);
+		if(lett == 'Z') motorPos[2] = lrintf(anglesTo[pos] * stepsPerMm[2]);
+		if(lett == 'A' || lett == 'B') motorPos[3] = lrintf(anglesTo[pos] * stepsPerMm[3]);
+		if(lett == 'C') motorPos[4] = lrintf(anglesTo[pos] * stepsPerMm[4]);
 	}
-	for (size_t axis = XYZ_AXES; axis < numVisibleAxes; ++axis)	{
+
+	for (size_t axis = numOfAxes; axis < numVisibleAxes; ++axis)	{
 		motorPos[axis] = lrintf(machinePos[axis] * stepsPerMm[axis]);
+
 	}
 
 	return true;
@@ -113,10 +120,15 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const float stepsPerMm[],
 		size_t numVisibleAxes, size_t numTotalAxes, float machinePos[]) const noexcept {
 
+	// a) called after connection established
+	// b) called once for every segment move
+
 	float angles[numOfAxes];
-	for(int i=0; i < numOfAxes; i++) {
-		angles[i] = ((float)motorPos[i]/stepsPerMm[i]);
-	}
+	angles[0] = (float) motorPos[4] / stepsPerMm[4]; // C
+	angles[1] = (float) motorPos[3] / stepsPerMm[3]; // A
+	angles[2] = (float) motorPos[2] / stepsPerMm[2]; // Z
+	angles[3] = (float) motorPos[0] / stepsPerMm[0]; // X
+	angles[4] = (float) motorPos[1] / stepsPerMm[1]; // Y
 
 	float mx[12];
 	getForwardBySkew(angles, mx);
@@ -136,9 +148,10 @@ bool RobotKinematics::IsReachable(float axesCoords[MaxAxes], AxesBitmap axes) co
 LimitPositionResult RobotKinematics::LimitPosition(float coords[], const float * null initialCoords,
 		size_t numVisibleAxes, AxesBitmap axesToLimit, bool isCoordinated, bool applyM208Limits) const noexcept {
 
-	const bool m208Limited = applyM208Limits && Kinematics::LimitPositionFromAxis(coords, 0, numVisibleAxes, axesToLimit);
-	return (m208Limited) ? LimitPositionResult::adjusted : LimitPositionResult::ok;
+//	const bool m208Limited = applyM208Limits && Kinematics::LimitPositionFromAxis(coords, 0, numVisibleAxes, axesToLimit);
+//	return (m208Limited) ? LimitPositionResult::adjusted : LimitPositionResult::ok;
 
+	return LimitPositionResult::ok;
 }
 
 void RobotKinematics::GetAssumedInitialPosition(size_t numAxes, float positions[]) const noexcept {
