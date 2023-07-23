@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.h
  *
- *  Created on: 10.06.2023
+ *  Created on: 23.07.2023
  *      Author: JoergS5
  */
 
@@ -53,6 +53,7 @@ public:
 
 	// temp variables, to be used only inside a method:
 	mutable String<StringLength20> tempS20; // to read values from strings
+	mutable String<StringLength50> tempS50; // to read values from strings
 	mutable float mxTemp[12];	// for short temp storage
 	mutable float temp4[4];
 
@@ -83,6 +84,7 @@ public:
 	mutable int offsetMreference = -1; // size numOfAxes *1  // angles/positions used for Mnoeap endpoint pos/ori
 	mutable int offsetAngleLimits = -1; // size numOfAxes*3 // min, max, home. -999.9 for NaN
 	mutable int offsetStartOfInverse = -1;		// where does inverse (PK) used cache start
+	mutable int offsetCurrentEnd = -1; // todo implement
 
 
 	// Config
@@ -90,6 +92,7 @@ public:
 	void setC(const char *value) const noexcept;
 	void setA(const char *value) const noexcept;
 	void setP(const char *value) const noexcept;
+	void reportConfiguration(GCodeBuffer& gb) const noexcept;
 
 
 	void setNumOfAxes() const noexcept;
