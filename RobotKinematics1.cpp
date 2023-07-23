@@ -1,7 +1,7 @@
 /*
  * RobotKinematics1.cpp config
  *
- *  Created on: 10.06.2023
+ *  Created on: 23.07.2023
  *      Author: JoergS5
  */
 
@@ -9,6 +9,8 @@
 #include <Platform/RepRap.h>
 #include <Platform/Platform.h>
 #include <Platform/Tasks.h>
+#include <GCodes/GCodeBuffer/GCodeBuffer.h>
+
 
 void RobotKinematics::setB(const char* _robottype) const noexcept {
 	tempS20.copy(_robottype);
@@ -17,23 +19,27 @@ void RobotKinematics::setB(const char* _robottype) const noexcept {
 		setAxisTypes("RRPPP"); // sets numOfAxes
 		setForwardChain("CAZ_corexy(XY)");
 	}
-	else if(tempS20.Contains("CoreXY5BC") == 0 || tempS20.Contains("CBZ_corexy(YX)") == 0
-			|| tempS20.Contains("CBZ_corexy(XY)") == 0) {
-		setAxisTypes("RRPPP"); // sets numOfAxes
-		setForwardChain("CBZ_corexy(XY)");
-	}
-	else if(tempS20.Contains("Industrial6") == 0) {
-		setAxisTypes("RRRRRR"); // sets numOfAxes
-		setForwardChain("RRRRRR");
-	}
-	else if(tempS20.Contains("Prusa5BC") == 0) {
-		setAxisTypes("RRPPP");
-		setForwardChain("CBYZX");
-	}
 	else {
-		setForwardChain(tempS20.c_str());
-		setAxisTypes("RRPPP"); // AC with 3 linear axes as default
+		tempS50.copy("currently only CoreXY5AC is supported\n");
+		consoleMessage(tempS50.GetRef());
 	}
+//	else if(tempS20.Contains("CoreXY5BC") == 0 || tempS20.Contains("CBZ_corexy(YX)") == 0
+//			|| tempS20.Contains("CBZ_corexy(XY)") == 0) {
+//		setAxisTypes("RRPPP"); // sets numOfAxes
+//		setForwardChain("CBZ_corexy(XY)");
+//	}
+//	else if(tempS20.Contains("Industrial6") == 0) {
+//		setAxisTypes("RRRRRR"); // sets numOfAxes
+//		setForwardChain("RRRRRR");
+//	}
+//	else if(tempS20.Contains("Prusa5BC") == 0) {
+//		setAxisTypes("RRPPP");
+//		setForwardChain("CBYZX");
+//	}
+//	else {
+//		setForwardChain(tempS20.c_str());
+//		setAxisTypes("RRPPP"); // AC with 3 linear axes as default
+//	}
 	initCache();
 }
 
@@ -55,6 +61,8 @@ void RobotKinematics::initCache() const noexcept {
 	offsetMreference = offsetScrewV + numOfRAxes*3;
 	offsetAngleLimits = offsetMreference + numOfAxes;
 	offsetStartOfInverse = offsetAngleLimits + numOfAxes*3;
+
+	offsetCurrentEnd = offsetStartOfInverse;
 }
 
 /*
@@ -153,6 +161,10 @@ void RobotKinematics::setAxisTypes(const char* types) const noexcept {
 
 void RobotKinematics::errorMessage(const StringRef &msg) const noexcept {
 	reprap.GetPlatform().Message(ErrorMessage, msg.c_str());
+}
+
+void RobotKinematics::consoleMessage(const StringRef &msg) const noexcept {
+	reprap.GetPlatform().Message(LoggedGenericMessage, msg.c_str());
 }
 
 
@@ -424,4 +436,87 @@ void RobotKinematics::checkAndChangeToolLength() const noexcept {
 			currentToolLength = newOffsets[1];
 		}
 	}
+}
+
+void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
+	const MessageType mt = (MessageType)(gb.GetResponseMessageType() | PushFlag);
+	reprap.GetPlatform().Message(mt, "=== M669 K13 current config ===\n");
+
+	// general information:
+	reprap.GetPlatform().MessageF(mt, "numOfAxes %i axisTypes %s chain %s (normal %s special %s)\n", numOfAxes, axisTypes,
+			forwardChain, forwardChainCompressed, forwardChainSpecial);
+
+	// axis details:
+	for(int i=0; i < numOfAxes; i++) {
+		char lett[2];
+		lett[0] = getLetterInChain(i);
+		lett[1] = '\0';
+
+		float orix = cache[offsetScrewOmega + i*3];
+		float oriy = cache[offsetScrewOmega + i*3+1];
+		float oriz = cache[offsetScrewOmega + i*3+2];
+		float ptx = cache[offsetScrewQ + i*3];
+		float pty = cache[offsetScrewQ + i*3+1];
+		float ptz = cache[offsetScrewQ + i*3+2];
+		float angMin = cache[offsetAngleLimits + i*3];
+		float angMax = cache[offsetAngleLimits + i*3+1];
+		float angHome = cache[offsetAngleLimits + i*3+2];
+
+		reprap.GetPlatform().MessageF(mt,
+				"axis %s ori: %.2f %.2f %.2f point: %.2f %.2f %.2f angles min/max/home: %.2f %.2f %.2f\n",
+				lett, (double) orix,
+				(double) oriy, (double) oriz, (double) ptx, (double) pty, (double) ptz,
+				(double) angMin, (double) angMax, (double) angHome);
+	}
+
+	// screw values:
+	reprap.GetPlatform().Message(mt,"Screw values:\n");
+	reprap.GetPlatform().Message(mt,"   reference angles/positions: ");
+	for(int i=0; i < numOfAxes; i++) {
+		float refAnglePos = cache[offsetMreference + i];
+		reprap.GetPlatform().MessageF(mt," %.2f", (double) refAnglePos);
+	}
+	reprap.GetPlatform().Message(mt,"\n");
+
+	reprap.GetPlatform().MessageF(mt,"   endpoint axis X: %.2f %.2f %.2f\n", (double) screw_M[0],
+			(double) screw_M[4], (double) screw_M[8]);
+	reprap.GetPlatform().MessageF(mt,"   endpoint axis Y: %.2f %.2f %.2f\n", (double) screw_M[1],
+			(double) screw_M[5], (double) screw_M[9]);
+	reprap.GetPlatform().MessageF(mt,"   endpoint axis Z: %.2f %.2f %.2f\n", (double) screw_M[2],
+			(double) screw_M[6], (double) screw_M[10]);
+	reprap.GetPlatform().MessageF(mt,"   endpoint point: %.2f %.2f %.2f\n", (double) screw_M[3],
+			(double) screw_M[7], (double) screw_M[11]);
+
+
+	reprap.GetPlatform().MessageF(mt,"   tool length %.2f, ori XYZ: %.2f %.2f %.2f\n",
+			(double) currentToolLength, (double) toolDirection[0],
+			(double) toolDirection[1], (double) toolDirection[2]);
+
+
+	if(specialMethod != 0) {
+		if(specialMethod == 1) { tempS20.copy("CoreXY"); }
+		if(specialMethod == 2) { tempS20.copy("CoreXZ"); }
+		if(specialMethod == 9) { tempS20.copy("5BarParScara"); }
+		if(specialMethod == 10) { tempS20.copy("RotaryDelta"); }
+		if(specialMethod == 14) { tempS20.copy("Palletized"); }
+		if(specialMethod == 15) { tempS20.copy("LinearDelta"); }
+		reprap.GetPlatform().MessageF(mt,"special kinematics set: %s\n", tempS20.c_str());
+		if(specialMethod == 9) {
+			reprap.GetPlatform().MessageF(mt,"   workmode: %i\n", (int) currentWorkmode);
+		}
+	}
+	if(numOfAxes == 5) {
+		reprap.GetPlatform().MessageF(mt,"abSign: %i ", abSign);
+		if(abSign == 0) {
+			reprap.GetPlatform().Message(mt," (0 means A (B) positive angle preference)\n");
+		}
+		else {
+			reprap.GetPlatform().Message(mt," (1 means A (B) negative angle preference)\n");
+		}
+	}
+
+	// cache used:
+	reprap.GetPlatform().MessageF(mt,"cache used: %i maximum: %i\n", offsetCurrentEnd, CACHESIZE);
+
+
 }
