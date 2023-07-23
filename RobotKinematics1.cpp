@@ -223,21 +223,21 @@ void RobotKinematics::setC(const char *value) const noexcept {
 			}
 		}
 	}
-	else if(tempS20.Contains("defaultToolLength=") == 0) {
-		int ct = getValueCount(value, "defaultToolLength=", ':', startpos);
-		if(ct == 1) {
-			currentToolLength = getFloatOfElement(value, ':', startpos, 0);
-		}
-	}
-	else if(tempS20.Contains("toolDirection=") == 0) {
-		int ct = getValueCount(value, "toolDirection=", ':', startpos);
-		if(ct == 3) {
-			toolDirection[0] = getFloatOfElement(value, ':', startpos, 0);
-			toolDirection[1] = getFloatOfElement(value, ':', startpos, 1);
-			toolDirection[2] = getFloatOfElement(value, ':', startpos, 2);
-			normalizeVector(toolDirection[0], toolDirection[1], toolDirection[2]);
-		}
-	}
+//	else if(tempS20.Contains("defaultToolLength=") == 0) {
+//		int ct = getValueCount(value, "defaultToolLength=", ':', startpos);
+//		if(ct == 1) {
+//			currentToolLength = getFloatOfElement(value, ':', startpos, 0);
+//		}
+//	}
+//	else if(tempS20.Contains("toolDirection=") == 0) {
+//		int ct = getValueCount(value, "toolDirection=", ':', startpos);
+//		if(ct == 3) {
+//			toolDirection[0] = getFloatOfElement(value, ':', startpos, 0);
+//			toolDirection[1] = getFloatOfElement(value, ':', startpos, 1);
+//			toolDirection[2] = getFloatOfElement(value, ':', startpos, 2);
+//			normalizeVector(toolDirection[0], toolDirection[1], toolDirection[2]);
+//		}
+//	}
 	else { // letter
 		// C"letter=omega1:omega2:omega3:q1:q2:q3" axis orientation and a point on the axis
 		char letter = value[0];
@@ -404,39 +404,39 @@ float RobotKinematics::stopClock() const noexcept {
 }
 
 
-void RobotKinematics::checkAndChangeToolLength() const noexcept {
-	float oldToolLength = currentToolLength;
-
-	// todo support all toolDirections
-
-	float newOffsets[3];
-	getToolOffsets(newOffsets);
-
-	if(toolDirection[0] == 0.0 && toolDirection[1] == 0.0 && toolDirection[2] == 1.0) {
-		if(oldToolLength != newOffsets[2]) {
-			float longer = newOffsets[2] - oldToolLength;
-			screw_M[11] -= longer;
-			recalcMInv();
-			currentToolLength = newOffsets[2];
-		}
-	}
-	else if(toolDirection[0] == 1.0 && toolDirection[1] == 0.0 && toolDirection[2] == 0.0) {
-		if(oldToolLength != newOffsets[0]) {
-			float longer = newOffsets[2] - oldToolLength;
-			screw_M[3] -= longer;
-			recalcMInv();
-			currentToolLength = newOffsets[0];
-		}
-	}
-	else if(toolDirection[0] == 0.0 && toolDirection[1] == 1.0 && toolDirection[2] == 0.0) {
-		if(oldToolLength != newOffsets[1]) {
-			float longer = newOffsets[2] - oldToolLength;
-			screw_M[7] -= longer;
-			recalcMInv();
-			currentToolLength = newOffsets[1];
-		}
-	}
-}
+//void RobotKinematics::checkAndChangeToolLength() const noexcept {
+//	float oldToolLength = currentToolLength;
+//
+//	// todo support all toolDirections
+//
+//	float newOffsets[3];
+//	getToolOffsets(newOffsets);
+//
+//	if(toolDirection[0] == 0.0 && toolDirection[1] == 0.0 && toolDirection[2] == 1.0) {
+//		if(oldToolLength != newOffsets[2]) {
+//			float longer = newOffsets[2] - oldToolLength;
+//			screw_M[11] -= longer;
+//			recalcMInv();
+//			currentToolLength = newOffsets[2];
+//		}
+//	}
+//	else if(toolDirection[0] == 1.0 && toolDirection[1] == 0.0 && toolDirection[2] == 0.0) {
+//		if(oldToolLength != newOffsets[0]) {
+//			float longer = newOffsets[2] - oldToolLength;
+//			screw_M[3] -= longer;
+//			recalcMInv();
+//			currentToolLength = newOffsets[0];
+//		}
+//	}
+//	else if(toolDirection[0] == 0.0 && toolDirection[1] == 1.0 && toolDirection[2] == 0.0) {
+//		if(oldToolLength != newOffsets[1]) {
+//			float longer = newOffsets[2] - oldToolLength;
+//			screw_M[7] -= longer;
+//			recalcMInv();
+//			currentToolLength = newOffsets[1];
+//		}
+//	}
+//}
 
 void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
 	const MessageType mt = (MessageType)(gb.GetResponseMessageType() | PushFlag);
@@ -488,9 +488,9 @@ void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
 			(double) screw_M[7], (double) screw_M[11]);
 
 
-	reprap.GetPlatform().MessageF(mt,"   tool length %.2f, ori XYZ: %.2f %.2f %.2f\n",
-			(double) currentToolLength, (double) toolDirection[0],
-			(double) toolDirection[1], (double) toolDirection[2]);
+//	reprap.GetPlatform().MessageF(mt,"   tool length %.2f, ori XYZ: %.2f %.2f %.2f\n",
+//			(double) currentToolLength, (double) toolDirection[0],
+//			(double) toolDirection[1], (double) toolDirection[2]);
 
 
 	if(specialMethod != 0) {
