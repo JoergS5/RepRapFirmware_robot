@@ -1,7 +1,7 @@
 /*
  * RobotKinematics2.cpp
  *
- *  Created on: 23.07.2023
+ *  Created on: 26 Jul 2023
  *      Author: JoergS5
  */
 
@@ -314,26 +314,27 @@ void RobotKinematics::multiplyRotationMatrix(const float *m1, const float *m2, f
 
 /*
  * get inverse
+ *
+ * cAngle in case of A0, set C to this angle
  */
-void RobotKinematics::getInverseBySkew(const float *mxTo, float *anglesTo) const noexcept {
-	//tempS20.copy(axisTypes);
+void RobotKinematics::getInverseBySkew(const float *mxTo, float *anglesTo, float cAngle) const noexcept {
 	if(specialMethod == 1) { // CoreXY AC or BC
 		int posA = getPositionOfLetterInChain('A');
 		if(posA >= 0) {
-			getInverseAC(mxTo, anglesTo, true);
+			getInverseAC(mxTo, anglesTo, true, cAngle);
 		}
 		else {
-			getInverseAC(mxTo, anglesTo, false);
+			getInverseAC(mxTo, anglesTo, false, cAngle);
 		}
 		getInverseCoreXY_XYZ(mxTo, anglesTo, true);
 	}
 	else {
 		int posA = getPositionOfLetterInChain('A');
 		if(posA >= 0) {
-			getInverseAC(mxTo, anglesTo, true);
+			getInverseAC(mxTo, anglesTo, true, cAngle);
 		}
 		else {
-			getInverseAC(mxTo, anglesTo, false);
+			getInverseAC(mxTo, anglesTo, false, cAngle);
 		}
 		getInverseCoreXY_XYZ(mxTo, anglesTo, false);
 	}
@@ -346,9 +347,10 @@ void RobotKinematics::getInverseBySkew(const float *mxTo, float *anglesTo) const
  * anglesCA: 0 has C, 1 has A/B. Array can be larger, but size 2 at least
  */
 
-void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, bool acMode) const noexcept {
-	if(mxTo[2] == 0.0 && mxTo[6] == 0.0 && mxTo[3] == 0.0 && mxTo[7] == 0.0) {
-		anglesCA[0] = 0.0;
+void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, bool acMode, float cAngle) const noexcept {
+
+	if(mxTo[2] == 0.0 && mxTo[6] == 0.0) {
+		anglesCA[0] = cAngle;
 	}
 	else {
 		if(acMode) {
@@ -358,19 +360,12 @@ void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, bool acMo
 			anglesCA[0] = atan2f(mxTo[6], mxTo[2]) * radiansToDegrees; // C
 		}
 	}
-
 	anglesCA[1] = acosf(mxTo[10]) * radiansToDegrees; // A/B
 
-	if(anglesCA[0] == 0.0) {
-		// take this result
+	if((abSign == 0 && anglesCA[1] >= 0.0) || (abSign == 1 && anglesCA[1] <= 0.0)) {
+		// this is ok
 	}
-	else if(anglesCA[0] > 0 && abSign == 0) {
-		// take this result
-	}
-	else if(abSign == 1 && anglesCA[0] < 0) {
-		// also ok
-	}
-	else {
+	else { // take other solution
 		if(anglesCA[0] < 0) {
 			anglesCA[0] += 180.0;
 			anglesCA[1] = - anglesCA[1];
@@ -386,9 +381,9 @@ void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, bool acMo
 void RobotKinematics::getInverseCoreXY_XYZ(const float *mxTo, float *anglesResult, bool iscorexy)
 		const noexcept {
 
-	// anglesResult 0 is C, 1 is A, already calculated
+	startClock();
 
-	// solution without correction of position effect of rotations:
+	// anglesResult 0 is C, 1 is A, already calculated
 	float anglesNew[5]; // order CAZXY
 	anglesNew[0] = anglesResult[0];
 	anglesNew[1] = anglesResult[1];
@@ -404,32 +399,22 @@ void RobotKinematics::getInverseCoreXY_XYZ(const float *mxTo, float *anglesResul
 	float mxXYZ[12];
 	getForwardBySkew(anglesNew, mxXYZ);
 
-	// effect of the rotations:
-	float diffX = mxXYZ[3] - mxTo[3];
-	float diffY = mxXYZ[7] - mxTo[7];
-	float diffZ = mxXYZ[11] - mxTo[11];
-
-	// correct angles XYZ:
-	float xyz[3];
-	xyz[0] = mxTo[11] + diffZ;
-	xyz[1] = mxTo[3] + diffX;
-	xyz[2] = mxTo[7] + diffY;
-
-	// subtract reference values and change values for CoreXY:
-	anglesResult[2] = xyz[0] - cache[offsetMreference+2]; // Z
+	anglesResult[2] = mxXYZ[11] - cache[offsetMreference+2]; // Z
 	if(iscorexy) {
-		float x = xyz[1] - cache[offsetMreference+3];
-		float y = xyz[2] - cache[offsetMreference+4];
+		float x = mxXYZ[3] - cache[offsetMreference+3];
+		float y = mxXYZ[7] - cache[offsetMreference+4];
 		anglesResult[3] = 0.5*(x + y);
 		anglesResult[4] = 0.5*(x - y);
 	}
 	else {
-		anglesResult[3] = xyz[1] - cache[offsetMreference+3]; // X
-		anglesResult[4] = xyz[2] - cache[offsetMreference+4]; // Y
+		anglesResult[3] = mxXYZ[3] - cache[offsetMreference+3]; // X
+		anglesResult[4] = mxXYZ[7] - cache[offsetMreference+4]; // Y
 	}
 	anglesResult[0] -= cache[offsetMreference]; //C
 	anglesResult[1] -= cache[offsetMreference+1]; //A
 
+	sumOfTimes += stopClock();
+	timeMeasurements++;
 }
 
 void RobotKinematics::normalizeVector(float &x, float &y, float &z) const noexcept {
@@ -452,9 +437,9 @@ void RobotKinematics::XYZACTomx(const float *xyzac, float *mx) const noexcept {
 	mx[7] = xyzac[1];
 	mx[11] = xyzac[2];
 
-	mx[2] = sin(xyzac[3]/radiansToDegrees) * sin(xyzac[4]/radiansToDegrees);
-	mx[6] = - cos(xyzac[4]/radiansToDegrees) * sin(xyzac[3]/radiansToDegrees);
-	mx[10] = cos(xyzac[3]/radiansToDegrees);	// cA
+	mx[2] = sinf(xyzac[3]/radiansToDegrees) * sinf(xyzac[4]/radiansToDegrees);
+	mx[6] = - cosf(xyzac[4]/radiansToDegrees) * sinf(xyzac[3]/radiansToDegrees);
+	mx[10] = cosf(xyzac[3]/radiansToDegrees);	// cA
 }
 
 /*
@@ -465,40 +450,40 @@ void RobotKinematics::XYZBCTomx(const float *xyzbc, float *mx) const noexcept {
 	mx[7] = xyzbc[1];
 	mx[11] = xyzbc[2];
 
-	mx[2] = cos(xyzbc[4]/radiansToDegrees) * sin(xyzbc[3]/radiansToDegrees);
-	mx[6] = sin(xyzbc[3]/radiansToDegrees) * sin(xyzbc[4]/radiansToDegrees);
-	mx[10] = cos(xyzbc[3]/radiansToDegrees);	// cosB
+	mx[2] = cosf(xyzbc[4]/radiansToDegrees) * sinf(xyzbc[3]/radiansToDegrees);
+	mx[6] = sinf(xyzbc[3]/radiansToDegrees) * sinf(xyzbc[4]/radiansToDegrees);
+	mx[10] = cosf(xyzbc[3]/radiansToDegrees);	// cosB
 }
 
 /*
  * for forward: translate mx matrix into XYZAC pos/angles (only z axis and pos of mx relevant)
  */
-void RobotKinematics::mxToXYZAC(const float *mx, float *xyzac) const noexcept {
+void RobotKinematics::mxToXYZAC(const float *mx, float *xyzac, float cAngle) const noexcept {
 	xyzac[0] = mx[3];
 	xyzac[1] = mx[7];
 	xyzac[2] = mx[11];
 
 	bool acMode = true;
 	float anglesCA[2];
-	getInverseAC(mx, anglesCA, acMode);
+	getInverseAC(mx, anglesCA, acMode, cAngle);
 	xyzac[3] = anglesCA[1]; // A
 	xyzac[4] = anglesCA[0]; // C
 }
 
-/*
- * for forward: translate mx matrix into XYZBC pos/angles (only z axis and pos of mx relevant)
- */
-void RobotKinematics::mxToXYZBC(const float *mx, float *xyzbc) const noexcept {
-	xyzbc[0] = mx[3];
-	xyzbc[1] = mx[7];
-	xyzbc[2] = mx[11];
-
-	bool acMode = false;
-	float anglesCB[5];
-	getInverseAC(mx, anglesCB, acMode);
-	xyzbc[3] = anglesCB[1]; // B
-	xyzbc[4] = anglesCB[0]; // C
-}
+///*
+// * for forward: translate mx matrix into XYZBC pos/angles (only z axis and pos of mx relevant)
+// */
+//void RobotKinematics::mxToXYZBC(const float *mx, float *xyzbc) const noexcept {
+//	xyzbc[0] = mx[3];
+//	xyzbc[1] = mx[7];
+//	xyzbc[2] = mx[11];
+//
+//	bool acMode = false;
+//	float anglesCB[5];
+//	getInverseAC(mx, anglesCB, acMode);
+//	xyzbc[3] = anglesCB[1]; // B
+//	xyzbc[4] = anglesCB[0]; // C
+//}
 
 
 #endif

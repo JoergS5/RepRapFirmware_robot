@@ -1,7 +1,7 @@
 /*
  * RobotKinematics1.cpp config
  *
- *  Created on: 23.07.2023
+ *  Created on: 26 Jul 2023
  *      Author: JoergS5
  */
 
@@ -167,6 +167,46 @@ void RobotKinematics::consoleMessage(const StringRef &msg) const noexcept {
 	reprap.GetPlatform().Message(LoggedGenericMessage, msg.c_str());
 }
 
+void RobotKinematics::debugMatrix(const char *title, const float*mx) const noexcept {
+	tempS50.Clear();
+	tempS50.catf("%s %.2f %.2f %.5f %.2f", title, (double) mx[0], (double) mx[1], (double) mx[2], (double) mx[3]);
+	consoleMessage(tempS50.GetRef());
+	tempS50.copy("\n");
+	consoleMessage(tempS50.GetRef());
+
+	tempS50.Clear();
+	tempS50.catf("   %.2f %.2f %.5f %.2f", (double) mx[4], (double) mx[5], (double) mx[6], (double) mx[7]);
+	consoleMessage(tempS50.GetRef());
+	tempS50.copy("\n");
+	consoleMessage(tempS50.GetRef());
+
+	tempS50.Clear();
+	tempS50.catf("   %.2f %.2f %.5f %.2f", (double) mx[8], (double) mx[9], (double) mx[10], (double) mx[11]);
+	consoleMessage(tempS50.GetRef());
+	tempS50.copy("\n");
+	consoleMessage(tempS50.GetRef());
+
+}
+
+void RobotKinematics::debugList(const char *title, int size, const float *list) const noexcept {
+	tempS50.Clear();
+	tempS50.catf("%s %.2f %.2f %.2f %.2f %.2f", title, (double) list[0], (double) list[1], (double) list[2],
+			(double) list[3], (double) list[4]);
+	consoleMessage(tempS50.GetRef());
+	tempS50.copy("\n");
+	consoleMessage(tempS50.GetRef());
+
+}
+
+void RobotKinematics::debugList(const char *title, int size, int32_t *list) const noexcept {
+	tempS50.Clear();
+	tempS50.catf("%s %i %i %i %i %i", title, (int) list[0], (int) list[1], (int) list[2],
+			(int) list[3], (int) list[4]);
+	consoleMessage(tempS50.GetRef());
+	tempS50.copy("\n");
+	consoleMessage(tempS50.GetRef());
+
+}
 
 float RobotKinematics::getFloatOfElement(const char *value, char separator, int startpos, int idx) const noexcept {
 	char v[20];
@@ -223,21 +263,6 @@ void RobotKinematics::setC(const char *value) const noexcept {
 			}
 		}
 	}
-//	else if(tempS20.Contains("defaultToolLength=") == 0) {
-//		int ct = getValueCount(value, "defaultToolLength=", ':', startpos);
-//		if(ct == 1) {
-//			currentToolLength = getFloatOfElement(value, ':', startpos, 0);
-//		}
-//	}
-//	else if(tempS20.Contains("toolDirection=") == 0) {
-//		int ct = getValueCount(value, "toolDirection=", ':', startpos);
-//		if(ct == 3) {
-//			toolDirection[0] = getFloatOfElement(value, ':', startpos, 0);
-//			toolDirection[1] = getFloatOfElement(value, ':', startpos, 1);
-//			toolDirection[2] = getFloatOfElement(value, ':', startpos, 2);
-//			normalizeVector(toolDirection[0], toolDirection[1], toolDirection[2]);
-//		}
-//	}
 	else { // letter
 		// C"letter=omega1:omega2:omega3:q1:q2:q3" axis orientation and a point on the axis
 		char letter = value[0];
@@ -353,6 +378,14 @@ void RobotKinematics::setP(const char *value) const noexcept {
 		}
 		setNumOfAxes();
 	}
+	else if(tempS20.Contains("abSign=") == 0) {
+		if(tempS20.EndsWith('1')) {
+			abSign = 1;
+		}
+		else {
+			abSign = 0;
+		}
+	}
 	else {
 
 	}
@@ -403,41 +436,6 @@ float RobotKinematics::stopClock() const noexcept {
 	}
 }
 
-
-//void RobotKinematics::checkAndChangeToolLength() const noexcept {
-//	float oldToolLength = currentToolLength;
-//
-//	// todo support all toolDirections
-//
-//	float newOffsets[3];
-//	getToolOffsets(newOffsets);
-//
-//	if(toolDirection[0] == 0.0 && toolDirection[1] == 0.0 && toolDirection[2] == 1.0) {
-//		if(oldToolLength != newOffsets[2]) {
-//			float longer = newOffsets[2] - oldToolLength;
-//			screw_M[11] -= longer;
-//			recalcMInv();
-//			currentToolLength = newOffsets[2];
-//		}
-//	}
-//	else if(toolDirection[0] == 1.0 && toolDirection[1] == 0.0 && toolDirection[2] == 0.0) {
-//		if(oldToolLength != newOffsets[0]) {
-//			float longer = newOffsets[2] - oldToolLength;
-//			screw_M[3] -= longer;
-//			recalcMInv();
-//			currentToolLength = newOffsets[0];
-//		}
-//	}
-//	else if(toolDirection[0] == 0.0 && toolDirection[1] == 1.0 && toolDirection[2] == 0.0) {
-//		if(oldToolLength != newOffsets[1]) {
-//			float longer = newOffsets[2] - oldToolLength;
-//			screw_M[7] -= longer;
-//			recalcMInv();
-//			currentToolLength = newOffsets[1];
-//		}
-//	}
-//}
-
 void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
 	const MessageType mt = (MessageType)(gb.GetResponseMessageType() | PushFlag);
 	reprap.GetPlatform().Message(mt, "=== M669 K13 current config ===\n");
@@ -486,12 +484,6 @@ void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
 			(double) screw_M[6], (double) screw_M[10]);
 	reprap.GetPlatform().MessageF(mt,"   endpoint point: %.2f %.2f %.2f\n", (double) screw_M[3],
 			(double) screw_M[7], (double) screw_M[11]);
-
-
-//	reprap.GetPlatform().MessageF(mt,"   tool length %.2f, ori XYZ: %.2f %.2f %.2f\n",
-//			(double) currentToolLength, (double) toolDirection[0],
-//			(double) toolDirection[1], (double) toolDirection[2]);
-
 
 	if(specialMethod != 0) {
 		if(specialMethod == 1) { tempS20.copy("CoreXY"); }

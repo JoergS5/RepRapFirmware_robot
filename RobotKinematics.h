@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.h
  *
- *  Created on: 23.07.2023
+ *  Created on: 26 Jul 2023
  *      Author: JoergS5
  */
 
@@ -59,20 +59,18 @@ public:
 
 
 	// robot and axis information
-	mutable char forwardChain[20];
+	mutable char forwardChain[20]; // subkinematics type, eg CAZ_corexy(XY)
 	mutable char forwardChainCompressed[MAXNUMOFAXES+1]; // letter of normal part, .: placeholder special handling
 	mutable char forwardChainSpecial[4+1];		// letter of special kinematics part
 	mutable char axisTypes[MAXNUMOFAXES+1]; // in order of chain: R rotational P prismatic p palletized
-	mutable int numOfAxes = 5;
+	mutable int numOfAxes = 5; // will be set by B or PaxisTypes
 	mutable float screw_M[12];
 	mutable float screw_MInv[12];
-//	mutable float currentToolLength = 100;
-//	mutable float toolDirection[3] = {0,0,1};
 
 	// special kinematics settings
 	mutable int specialMethod = 0;	// 1 CoreXY 2 CoreXZ 9 5barParScara 10 RotaryDelta 14 Palletized 15 LinearDelta
-	mutable size_t currentWorkmode = 0;
-	mutable int abSign = 0; // 0=A,B positive angle, 1=negative for AC/BC systems
+	mutable size_t currentWorkmode = 0; // for 5 bar scara
+	mutable int abSign = 0; // for 5 axis. 0=A,B positive angle, 1=negative for AC/BC systems
 
 	mutable size_t forwardProc[FORWPROC]; // forward processor
 	mutable size_t inverseProc[INVPROC]; // inverse processor
@@ -131,7 +129,15 @@ public:
 	float stopClock() const noexcept;
 	void consoleMessage(const StringRef &msg) const noexcept;
 	void errorMessage(const StringRef &msg) const noexcept;
-	void debugMx(float *mx) const noexcept; // disabled for RRFMODE
+	mutable float sumOfTimes = 0.0; // microseconds
+	mutable int timeMeasurements = 0; // sumOfTimes/timeMeasurements give the average
+
+
+
+	void debugMatrix(const char *title, const float*mx) const noexcept;
+	void debugList(const char *title, int size, const float *list) const noexcept;
+	void debugList(const char *title, int size, int32_t *list) const noexcept;
+
 
 
 	void getRodrigues(float *screwO, float *screwQ, float theta, float *mx, bool isRotational) const noexcept;
@@ -213,26 +219,18 @@ public:
 		}
 	}
 */
-	// forward
-	//void getToolOffsets(float *offsets) const noexcept;
-	//void getToolDirection(float *direction) const noexcept;
-	//void checkAndChangeToolLength() const noexcept;
-
+	// forward, inverse by screw
 	void getForwardBySkew(const float *angles, float *mxTo) const noexcept;
 	void getForwardSpecialParts(const float *angles, int i, float *mxTo) const noexcept;
 
 	void XYZACTomx(const float *xyzac, float *mx) const noexcept;
 	void XYZBCTomx(const float *xyzbc, float *mx) const noexcept;
-	void mxToXYZAC(const float *mx, float *xyzac) const noexcept;
-	void mxToXYZBC(const float *mx, float *xyzbc) const noexcept;
+	void mxToXYZAC(const float *mx, float *xyzac, float cAngle) const noexcept;
+//	void mxToXYZBC(const float *mx, float *xyzbc) const noexcept;
 
-	void getInverseBySkew(const float *mxTo, float *anglesResult) const noexcept;
-	void getInverseAC(const float *mxTo, float *anglesResult, bool acMode) const noexcept;
+	void getInverseBySkew(const float *mxTo, float *anglesResult, float cAngle) const noexcept;
+	void getInverseAC(const float *mxTo, float *anglesResult, bool acMode, float cAngle) const noexcept;
 	void getInverseCoreXY_XYZ(const float *mxTo, float *anglesResult, bool iscorexy) const noexcept;
-
-
-
-
 
 
 protected:
