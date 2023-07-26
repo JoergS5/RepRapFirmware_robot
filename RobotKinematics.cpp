@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 23.07.2023
+ *  Created on: 26 Jul 2023
  *      Author: JoergS5
  */
 
@@ -79,6 +79,15 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 			seen = true;
 		}
 
+		if (gb.Seen('R')) {
+			float avgTime = sumOfTimes / (float) timeMeasurements;
+			tempS50.catf("avg Time inverse kin: %.2f microseconds", (double) avgTime);
+			consoleMessage(tempS50.GetRef());
+			tempS50.copy("\n");
+			consoleMessage(tempS50.GetRef());
+			seen = true;
+		}
+
 		if(!seen) {
 			reportConfiguration(gb);
 		}
@@ -94,11 +103,14 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const float stepsPerMm[],
 		size_t numVisibleAxes, size_t numTotalAxes, int32_t motorPos[], bool isCoordinated) const noexcept {
 
+//	debugList("machinePos/Cart", 5, machinePos);
 	float mx[12];
 	XYZACTomx(machinePos, mx);
+//	debugMatrix("XYZACTomx", mx);
 
 	float anglesTo[numOfAxes];
-	getInverseBySkew(mx, anglesTo);
+	getInverseBySkew(mx, anglesTo, machinePos[4]);
+//	debugList("angles", 5, anglesTo);
 
 	for(int pos=0; pos < numOfAxes; pos++) {
 		char lett = getLetterInChain(pos);
@@ -111,8 +123,8 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 
 	for (size_t axis = numOfAxes; axis < numVisibleAxes; ++axis)	{
 		motorPos[axis] = lrintf(machinePos[axis] * stepsPerMm[axis]);
-
 	}
+//	debugList("motorPos", 5, motorPos);
 
 	return true;
 }
@@ -133,8 +145,10 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	float mx[12];
 	getForwardBySkew(angles, mx);
 
+	float cAngle = angles[0]; //handle case A0
+
 	float xyzac[5];
-	mxToXYZAC(mx, xyzac);
+	mxToXYZAC(mx, xyzac, cAngle);
 
 	for(int i=0; i < 5; i++) {
 		machinePos[i] = xyzac[i];
