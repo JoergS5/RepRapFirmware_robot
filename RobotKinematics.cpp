@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 26 Jul 2023
+ *  Created on: 28 Jul 2023
  *      Author: JoergS5
  */
 
@@ -103,14 +103,11 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const float stepsPerMm[],
 		size_t numVisibleAxes, size_t numTotalAxes, int32_t motorPos[], bool isCoordinated) const noexcept {
 
-//	debugList("machinePos/Cart", 5, machinePos);
 	float mx[12];
 	XYZACTomx(machinePos, mx);
-//	debugMatrix("XYZACTomx", mx);
 
 	float anglesTo[numOfAxes];
 	getInverseBySkew(mx, anglesTo, machinePos[4]);
-//	debugList("angles", 5, anglesTo);
 
 	for(int pos=0; pos < numOfAxes; pos++) {
 		char lett = getLetterInChain(pos);
@@ -124,7 +121,6 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 	for (size_t axis = numOfAxes; axis < numVisibleAxes; ++axis)	{
 		motorPos[axis] = lrintf(machinePos[axis] * stepsPerMm[axis]);
 	}
-//	debugList("motorPos", 5, motorPos);
 
 	return true;
 }

@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.h
  *
- *  Created on: 26 Jul 2023
+ *  Created on: 28 Jul 2023
  *      Author: JoergS5
  */
 
@@ -70,7 +70,7 @@ public:
 	// special kinematics settings
 	mutable int specialMethod = 0;	// 1 CoreXY 2 CoreXZ 9 5barParScara 10 RotaryDelta 14 Palletized 15 LinearDelta
 	mutable size_t currentWorkmode = 0; // for 5 bar scara
-	mutable int abSign = 0; // for 5 axis. 0=A,B positive angle, 1=negative for AC/BC systems
+	mutable int abSign = 0; // for 5 axis. 0=A,B positive angle, 1=negative for AC/BC systems, 2 = don't change
 
 	mutable size_t forwardProc[FORWPROC]; // forward processor
 	mutable size_t inverseProc[INVPROC]; // inverse processor
@@ -221,12 +221,11 @@ public:
 */
 	// forward, inverse by screw
 	void getForwardBySkew(const float *angles, float *mxTo) const noexcept;
-	void getForwardSpecialParts(const float *angles, int i, float *mxTo) const noexcept;
 
 	void XYZACTomx(const float *xyzac, float *mx) const noexcept;
 	void XYZBCTomx(const float *xyzbc, float *mx) const noexcept;
 	void mxToXYZAC(const float *mx, float *xyzac, float cAngle) const noexcept;
-//	void mxToXYZBC(const float *mx, float *xyzbc) const noexcept;
+	void mxToXYZBC(const float *mx, float *xyzbc, float cAngle) const noexcept;
 
 	void getInverseBySkew(const float *mxTo, float *anglesResult, float cAngle) const noexcept;
 	void getInverseAC(const float *mxTo, float *anglesResult, bool acMode, float cAngle) const noexcept;
