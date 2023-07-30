@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.h
  *
- *  Created on: 28 Jul 2023
+ *  Created on: 30 Jul 2023
  *      Author: JoergS5
  */
 
@@ -71,6 +71,7 @@ public:
 	mutable int specialMethod = 0;	// 1 CoreXY 2 CoreXZ 9 5barParScara 10 RotaryDelta 14 Palletized 15 LinearDelta
 	mutable size_t currentWorkmode = 0; // for 5 bar scara
 	mutable int abSign = 0; // for 5 axis. 0=A,B positive angle, 1=negative for AC/BC systems, 2 = don't change
+	mutable int abcType = 0; // for 5 axis: 0=AC, 1=BC, other types can be added later
 
 	mutable size_t forwardProc[FORWPROC]; // forward processor
 	mutable size_t inverseProc[INVPROC]; // inverse processor
@@ -81,8 +82,8 @@ public:
 	mutable int offsetScrewV = -1; // only for R axes *3 // cross product V = - omega x Q
 	mutable int offsetMreference = -1; // size numOfAxes *1  // angles/positions used for Mnoeap endpoint pos/ori
 	mutable int offsetAngleLimits = -1; // size numOfAxes*3 // min, max, home. -999.9 for NaN
-	mutable int offsetStartOfInverse = -1;		// where does inverse (PK) used cache start
-	mutable int offsetCurrentEnd = -1; // todo implement
+	mutable int offsetStartOfInverse = -1;		// where does inverse (Paden-Kahan) used cache start
+	mutable int offsetCurrentEnd = -1; // point to end of currently used cache
 
 
 	// Config
@@ -228,7 +229,7 @@ public:
 	void mxToXYZBC(const float *mx, float *xyzbc, float cAngle) const noexcept;
 
 	void getInverseBySkew(const float *mxTo, float *anglesResult, float cAngle) const noexcept;
-	void getInverseAC(const float *mxTo, float *anglesResult, bool acMode, float cAngle) const noexcept;
+	void getInverseAC(const float *mxTo, float *anglesResult, float cAngle) const noexcept;
 	void getInverseCoreXY_XYZ(const float *mxTo, float *anglesResult, bool iscorexy) const noexcept;
 
 

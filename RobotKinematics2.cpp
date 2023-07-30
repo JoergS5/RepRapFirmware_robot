@@ -1,7 +1,7 @@
 /*
  * RobotKinematics2.cpp
  *
- *  Created on: 28 Jul 2023
+ *  Created on: 30 Jul 2023
  *      Author: JoergS5
  */
 
@@ -292,13 +292,7 @@ void RobotKinematics::multiplyRotationMatrix(const float *m1, const float *m2, f
  */
 void RobotKinematics::getInverseBySkew(const float *mxTo, float *anglesTo, float cAngle) const noexcept {
 	if(specialMethod == 1) { // CoreXY AC or BC
-		int posA = getPositionOfLetterInChain('A');
-		if(posA >= 0) {
-			getInverseAC(mxTo, anglesTo, true, cAngle);
-		}
-		else {
-			getInverseAC(mxTo, anglesTo, false, cAngle);
-		}
+		getInverseAC(mxTo, anglesTo, cAngle);
 		getInverseCoreXY_XYZ(mxTo, anglesTo, true);
 	}
 	else {
@@ -314,17 +308,21 @@ void RobotKinematics::getInverseBySkew(const float *mxTo, float *anglesTo, float
  * anglesCA: 0 has C, 1 has A/B. Array can be larger, but size 2 at least
  */
 
-void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, bool acMode, float cAngle) const noexcept {
+void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, float cAngle) const noexcept {
 
 	if(mxTo[2] == 0.0 && mxTo[6] == 0.0) {
 		anglesCA[0] = cAngle;
 	}
 	else {
-		if(acMode) {
+		if(abcType == 0) { // AC
 			anglesCA[0] = atan2f(mxTo[2], -mxTo[6]) * radiansToDegrees; // C
 		}
-		else {
+		else if(abcType == 1) { // BC
 			anglesCA[0] = atan2f(mxTo[6], mxTo[2]) * radiansToDegrees; // C
+		}
+		else {
+			tempS50.copy("error: CoreXY AC type is not defined");
+			errorMessage(tempS50.GetRef());
 		}
 	}
 	anglesCA[1] = acosf(mxTo[10]) * radiansToDegrees; // A/B
@@ -424,9 +422,8 @@ void RobotKinematics::mxToXYZAC(const float *mx, float *xyzac, float cAngle) con
 	xyzac[1] = mx[7];
 	xyzac[2] = mx[11];
 
-	bool acMode = true;
 	float anglesCA[2];
-	getInverseAC(mx, anglesCA, acMode, cAngle);
+	getInverseAC(mx, anglesCA, cAngle);
 	xyzac[3] = anglesCA[1]; // A
 	xyzac[4] = anglesCA[0]; // C
 }
@@ -439,9 +436,8 @@ void RobotKinematics::mxToXYZBC(const float *mx, float *xyzbc, float cAngle) con
 	xyzbc[1] = mx[7];
 	xyzbc[2] = mx[11];
 
-	bool acMode = false;
-	float anglesCB[5];
-	getInverseAC(mx, anglesCB, acMode, cAngle);
+	float anglesCB[2];
+	getInverseAC(mx, anglesCB, cAngle);
 	xyzbc[3] = anglesCB[1]; // B
 	xyzbc[4] = anglesCB[0]; // C
 }

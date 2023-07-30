@@ -1,7 +1,7 @@
 /*
  * RobotKinematics1.cpp config
  *
- *  Created on: 28 Jul 2023
+ *  Created on: 30 Jul 2023
  *      Author: JoergS5
  */
 
@@ -16,30 +16,20 @@ void RobotKinematics::setB(const char* _robottype) const noexcept {
 	tempS20.copy(_robottype);
 	if(tempS20.Contains("CoreXY5AC") == 0 || tempS20.Contains("CAZ_corexy(YX)") == 0
 			|| tempS20.Contains("CAZ_corexy(XY)") == 0) {
-		setAxisTypes("RRPPP"); // sets numOfAxes
+		setAxisTypes("RRPPP"); // sets numOfAxes also
 		setForwardChain("CAZ_corexy(XY)");
+		abcType = 0;
+	}
+	else if(tempS20.Contains("CoreXY5BC") == 0 || tempS20.Contains("CBZ_corexy(YX)") == 0
+			|| tempS20.Contains("CBZ_corexy(XY)") == 0) {
+		setAxisTypes("RRPPP"); // sets numOfAxes also
+		setForwardChain("CBZ_corexy(XY)"); // sets specialMethod also
+		abcType = 1;
 	}
 	else {
 		tempS50.copy("currently only CoreXY5AC is supported\n");
 		consoleMessage(tempS50.GetRef());
 	}
-//	else if(tempS20.Contains("CoreXY5BC") == 0 || tempS20.Contains("CBZ_corexy(YX)") == 0
-//			|| tempS20.Contains("CBZ_corexy(XY)") == 0) {
-//		setAxisTypes("RRPPP"); // sets numOfAxes
-//		setForwardChain("CBZ_corexy(XY)");
-//	}
-//	else if(tempS20.Contains("Industrial6") == 0) {
-//		setAxisTypes("RRRRRR"); // sets numOfAxes
-//		setForwardChain("RRRRRR");
-//	}
-//	else if(tempS20.Contains("Prusa5BC") == 0) {
-//		setAxisTypes("RRPPP");
-//		setForwardChain("CBYZX");
-//	}
-//	else {
-//		setForwardChain(tempS20.c_str());
-//		setAxisTypes("RRPPP"); // AC with 3 linear axes as default
-//	}
 	initCache();
 }
 
@@ -499,12 +489,7 @@ void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
 	}
 	if(numOfAxes == 5) {
 		reprap.GetPlatform().MessageF(mt,"abSign: %i ", abSign);
-		if(abSign == 0) {
-			reprap.GetPlatform().Message(mt," (0 means A (B) positive angle preference)\n");
-		}
-		else {
-			reprap.GetPlatform().Message(mt," (1 means A (B) negative angle preference)\n");
-		}
+		reprap.GetPlatform().Message(mt," (A angle preference: 0 take >=0, 1 take <= 0, 2 don't change calculation\n");
 	}
 
 	// cache used:

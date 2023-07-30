@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 28 Jul 2023
+ *  Created on: 30 Jul 2023
  *      Author: JoergS5
  */
 
@@ -104,7 +104,12 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 		size_t numVisibleAxes, size_t numTotalAxes, int32_t motorPos[], bool isCoordinated) const noexcept {
 
 	float mx[12];
-	XYZACTomx(machinePos, mx);
+	if(abcType == 0) {
+		XYZACTomx(machinePos, mx);
+	}
+	else if(abcType == 1) {
+		XYZBCTomx(machinePos, mx);
+	}
 
 	float anglesTo[numOfAxes];
 	getInverseBySkew(mx, anglesTo, machinePos[4]);
@@ -133,7 +138,7 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 
 	float angles[numOfAxes];
 	angles[0] = (float) motorPos[4] / stepsPerMm[4]; // C
-	angles[1] = (float) motorPos[3] / stepsPerMm[3]; // A
+	angles[1] = (float) motorPos[3] / stepsPerMm[3]; // A or B
 	angles[2] = (float) motorPos[2] / stepsPerMm[2]; // Z
 	angles[3] = (float) motorPos[0] / stepsPerMm[0]; // X
 	angles[4] = (float) motorPos[1] / stepsPerMm[1]; // Y
