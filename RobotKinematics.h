@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.h
  *
- *  Created on: 30 Jul 2023
+ *  Created on: 01 Aug 2023
  *      Author: JoergS5
  */
 

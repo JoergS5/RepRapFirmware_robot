@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 30 Jul 2023
+ *  Created on: 01 Aug 2023
  *      Author: JoergS5
  */
 
@@ -147,13 +147,18 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	getForwardBySkew(angles, mx);
 
 	float cAngle = angles[0]; //handle case A0
-
 	float xyzac[5];
-	mxToXYZAC(mx, xyzac, cAngle);
+	if(abcType == 0) {
+		mxToXYZAC(mx, xyzac, cAngle);
+	}
+	else if(abcType == 1) {
+		mxToXYZBC(mx, xyzac, cAngle);
+	}
 
 	for(int i=0; i < 5; i++) {
 		machinePos[i] = xyzac[i];
 	}
+
 }
 
 bool RobotKinematics::IsReachable(float axesCoords[MaxAxes], AxesBitmap axes) const noexcept {

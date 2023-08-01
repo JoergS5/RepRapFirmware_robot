@@ -1,7 +1,7 @@
 /*
  * RobotKinematics1.cpp config
  *
- *  Created on: 30 Jul 2023
+ *  Created on: 01 Aug 2023
  *      Author: JoergS5
  */
 
@@ -27,7 +27,7 @@ void RobotKinematics::setB(const char* _robottype) const noexcept {
 		abcType = 1;
 	}
 	else {
-		tempS50.copy("currently only CoreXY5AC is supported\n");
+		tempS50.copy("currently only CoreXY5AC and CoreXY5BC are supported\n");
 		consoleMessage(tempS50.GetRef());
 	}
 	initCache();
@@ -489,7 +489,7 @@ void RobotKinematics::reportConfiguration(GCodeBuffer& gb) const noexcept {
 	}
 	if(numOfAxes == 5) {
 		reprap.GetPlatform().MessageF(mt,"abSign: %i ", abSign);
-		reprap.GetPlatform().Message(mt," (A angle preference: 0 take >=0, 1 take <= 0, 2 don't change calculation\n");
+		reprap.GetPlatform().Message(mt," (A/B angle preference: 0 take >=0, 1 take <= 0, 2 don't change calculation\n");
 	}
 
 	// cache used:
