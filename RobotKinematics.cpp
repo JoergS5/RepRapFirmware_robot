@@ -140,8 +140,14 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	angles[0] = (float) motorPos[4] / stepsPerMm[4]; // C
 	angles[1] = (float) motorPos[3] / stepsPerMm[3]; // A or B
 	angles[2] = (float) motorPos[2] / stepsPerMm[2]; // Z
-	angles[3] = (float) motorPos[0] / stepsPerMm[0]; // X
-	angles[4] = (float) motorPos[1] / stepsPerMm[1]; // Y
+	if(specialMethod == 1) {
+		angles[3] = 0.5*((float) motorPos[0] / stepsPerMm[0] + (float) motorPos[1] / stepsPerMm[1]);
+		angles[4] = 0.5*((float) motorPos[0] / stepsPerMm[0] - (float) motorPos[1] / stepsPerMm[1]);
+	}
+	else {
+		angles[3] = (float) motorPos[0] / stepsPerMm[0]; // X
+		angles[4] = (float) motorPos[1] / stepsPerMm[1]; // Y
+	}
 
 	float mx[12];
 	getForwardBySkew(angles, mx);

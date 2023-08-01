@@ -362,8 +362,8 @@ void RobotKinematics::getInverseCoreXY_XYZ(const float *mxTo, float *anglesResul
 	if(iscorexy) {
 		float x = mxXYZ[3] - cache[offsetMreference+3];
 		float y = mxXYZ[7] - cache[offsetMreference+4];
-		anglesResult[3] = 0.5*(x + y);
-		anglesResult[4] = 0.5*(x - y);
+		anglesResult[3] = x + y;
+		anglesResult[4] = x - y;
 	}
 	else {
 		anglesResult[3] = mxXYZ[3] - cache[offsetMreference+3]; // X
