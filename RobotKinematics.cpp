@@ -147,7 +147,7 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 		rotorA[3] = - sinf(angleA / 2.0); // X direction
 	}
 	else if(abcType == 1) { // BC
-		rotorA[2] = - sinf(angleA / 2.0); // Y direction
+		rotorA[2] = sinf(angleA / 2.0); // Y direction
 	}
 	float point4[5];
 	GAcalculateRotor(rotorA, point3, point4); // ptTo=R*pt/R;
