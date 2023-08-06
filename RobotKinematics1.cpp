@@ -1,7 +1,7 @@
 /*
  * RobotKinematics1.cpp config
  *
- *  Created on: 01 Aug 2023
+ *  Created on: 06 Aug 2023
  *      Author: JoergS5
  */
 

@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.cpp
  *
- *  Created on: 01 Aug 2023
+ *  Created on: 06 Aug 2023
  *      Author: JoergS5
  */
 
@@ -81,6 +81,7 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 
 		if (gb.Seen('R')) {
 			float avgTime = sumOfTimes / (float) timeMeasurements;
+			tempS50.Clear();
 			tempS50.catf("avg Time inverse kin: %.2f microseconds", (double) avgTime);
 			consoleMessage(tempS50.GetRef());
 			tempS50.copy("\n");
@@ -103,67 +104,143 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const float stepsPerMm[],
 		size_t numVisibleAxes, size_t numTotalAxes, int32_t motorPos[], bool isCoordinated) const noexcept {
 
-	float mx[12];
+	//startClock();
+
+	float offAy = 0;
+	float offAz = 0;
 	if(abcType == 0) {
-		XYZACTomx(machinePos, mx);
+		int i = getPositionOfLetterInChain('A');
+		offAy = cache[i*3+ offsetScrewQ+1];
+		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 	else if(abcType == 1) {
-		XYZBCTomx(machinePos, mx);
+		int i = getPositionOfLetterInChain('B');
+		offAy = cache[i*3+ offsetScrewQ+1];
+		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 
-	float anglesTo[numOfAxes];
-	getInverseBySkew(mx, anglesTo, machinePos[4]);
+	float point[5] = {machinePos[0], machinePos[1], machinePos[2], 0, 1.0}; // point 1...5
+	point[3] = 0.5 * (point[0]*point[0] + point[1]*point[1] + point[2]*point[2]);
 
-	for(int pos=0; pos < numOfAxes; pos++) {
-		char lett = getLetterInChain(pos);
-		if(lett == 'X') motorPos[0] = lrintf(anglesTo[pos] * stepsPerMm[0]);
-		if(lett == 'Y') motorPos[1] = lrintf(anglesTo[pos] * stepsPerMm[1]);
-		if(lett == 'Z') motorPos[2] = lrintf(anglesTo[pos] * stepsPerMm[2]);
-		if(lett == 'A' || lett == 'B') motorPos[3] = lrintf(anglesTo[pos] * stepsPerMm[3]);
-		if(lett == 'C') motorPos[4] = lrintf(anglesTo[pos] * stepsPerMm[4]);
+	// rotate by C
+	float angleC = machinePos[4] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorC[4] = {0,0,0,0};	// 0, 6, 7, 10 cos/z/y/x
+	rotorC[0] = cosf(angleC / 2.0);
+	rotorC[1] = -sinf(angleC / 2.0); // Z and X with minus sign
+	float point2[5];
+	GAcalculateRotor(rotorC, point, point2); // ptTo=R*pt/R;
+
+	// translate by - A offsets:
+	float point3[5] = {point2[0], point2[1] - offAy, point2[2] - offAz, 0, 1};
+	point3[3] = 0.5 * (point3[0]*point3[0] + point3[1]*point3[1] + point3[2]*point3[2]);
+
+	// rotate by A, store in point4:
+	float angleA = machinePos[3] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorA[4] = {cosf(angleA / 2.0), 0, 0, 0};	// 0, 6, 7, 10 cos/z/y/x
+	if(abcType == 0) { // AC
+		rotorA[3] = - sinf(angleA / 2.0); // X direction
 	}
+	else if(abcType == 1) { // BC
+		rotorA[2] = - sinf(angleA / 2.0); // Y direction
+	}
+	float point4[5];
+	GAcalculateRotor(rotorA, point3, point4); // ptTo=R*pt/R;
+
+	// translate by - A offsets back:
+	float point5[5] = {point4[0], point4[1] + offAy, point4[2] + offAz, 0, 1};
+	point5[3] = 0.5 * (point5[0]*point5[0] + point5[1]*point5[1] + point5[2]*point5[2]);
+
+
+	float coreX = point5[0];
+	float coreY = point5[1];
+	if(specialMethod == 1) { // CoreXY
+		coreX = point5[0] + point5[1];
+		coreY = point5[0] - point5[1];
+	}
+	motorPos[0] = lrintf(coreX * stepsPerMm[0]); // X (A stepper)
+	motorPos[1] = lrintf(coreY * stepsPerMm[1]); // Y (B stepper)
+	motorPos[2] = lrintf(point5[2] * stepsPerMm[2]); // Z
+	motorPos[3] = lrintf(machinePos[3] * stepsPerMm[3]); // A/B
+	motorPos[4] = lrintf(machinePos[4] * stepsPerMm[4]); // C
+
 
 	for (size_t axis = numOfAxes; axis < numVisibleAxes; ++axis)	{
 		motorPos[axis] = lrintf(machinePos[axis] * stepsPerMm[axis]);
 	}
 
+//	sumOfTimes += stopClock();
+//	timeMeasurements++;
+
 	return true;
 }
 
+//called after connection established, called once for every segment move:
+
 void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const float stepsPerMm[],
 		size_t numVisibleAxes, size_t numTotalAxes, float machinePos[]) const noexcept {
-
-	// a) called after connection established
-	// b) called once for every segment move
+	startClock();
 
 	float angles[numOfAxes];
-	angles[0] = (float) motorPos[4] / stepsPerMm[4]; // C
-	angles[1] = (float) motorPos[3] / stepsPerMm[3]; // A or B
-	angles[2] = (float) motorPos[2] / stepsPerMm[2]; // Z
-	if(specialMethod == 1) {
-		angles[3] = 0.5*((float) motorPos[0] / stepsPerMm[0] + (float) motorPos[1] / stepsPerMm[1]);
-		angles[4] = 0.5*((float) motorPos[0] / stepsPerMm[0] - (float) motorPos[1] / stepsPerMm[1]);
+	if(specialMethod == 1) { // CoreXY
+		angles[0] = 0.5*((float) motorPos[0] / stepsPerMm[0] + (float) motorPos[1] / stepsPerMm[1]);
+		angles[1] = 0.5*((float) motorPos[0] / stepsPerMm[0] - (float) motorPos[1] / stepsPerMm[1]);
 	}
 	else {
-		angles[3] = (float) motorPos[0] / stepsPerMm[0]; // X
-		angles[4] = (float) motorPos[1] / stepsPerMm[1]; // Y
+		angles[0] = (float) motorPos[0] / stepsPerMm[0]; // X
+		angles[1] = (float) motorPos[1] / stepsPerMm[1]; // Y
 	}
+	angles[2] = (float) motorPos[2] / stepsPerMm[2]; // Z
+	angles[3] = (float) motorPos[3] / stepsPerMm[3]; // A or B
+	angles[4] = (float) motorPos[4] / stepsPerMm[4]; // C
 
-	float mx[12];
-	getForwardBySkew(angles, mx);
 
-	float cAngle = angles[0]; //handle case A0
-	float xyzac[5];
+	float offAy = 0;
+	float offAz = 0;
 	if(abcType == 0) {
-		mxToXYZAC(mx, xyzac, cAngle);
+		int i = getPositionOfLetterInChain('A');
+		offAy = cache[i*3+ offsetScrewQ+1];
+		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 	else if(abcType == 1) {
-		mxToXYZBC(mx, xyzac, cAngle);
+		int i = getPositionOfLetterInChain('B');
+		offAy = cache[i*3+ offsetScrewQ+1];
+		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 
-	for(int i=0; i < 5; i++) {
-		machinePos[i] = xyzac[i];
+
+	float point2[5] = {angles[0], angles[1] - offAy, angles[2] - offAz, 0, 1};
+	point2[3] = 0.5 * (point2[0]*point2[0] + point2[1]*point2[1] + point2[2]*point2[2]);
+
+	// rotate negative A:
+	float angleA = angles[3] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorA[4] = {cosf(-angleA / 2.0), 0, 0, 0};	// 0, 6, 7, 10 cos/z/y/x
+	if(abcType == 0) { // AC axis direction 1,0,0
+		rotorA[3] = - sinf(-angleA / 2.0); // X direction
 	}
+	else if(abcType == 1) { // BC, other axis direction 0,1,0
+		rotorA[2] = sinf(-angleA / 2.0); // Y direction
+	}
+	float point3[5];
+	GAcalculateRotor(rotorA, point2, point3); // ptTo=R*pt/R;
+
+	// translate by A offset back:
+	float point4[5] = {point3[0], point3[1] + offAy, point3[2] + offAz, 0, 1};
+	point4[3] = 0.5 * (point4[0]*point4[0] + point4[1]*point4[1] + point4[2]*point4[2]);
+
+	// rotate negative C:
+	float angleC = angles[4] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorC[4] = {cosf(-angleC / 2.0), - sinf(-angleC / 2.0), 0, 0};	// 0, 6, 7, 10 cos/z/y/x
+	float point5[5];
+	GAcalculateRotor(rotorC, point4, point5); // ptTo=R*pt/R;
+
+	machinePos[0] = point5[0];
+	machinePos[1] = point5[1];
+	machinePos[2] = point5[2];
+	machinePos[3] = angles[3];
+	machinePos[4] = angles[4];
+
+	sumOfTimes += stopClock();
+	timeMeasurements++;
 
 }
 

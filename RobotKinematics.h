@@ -1,7 +1,7 @@
 /*
  * RobotKinematics.h
  *
- *  Created on: 01 Aug 2023
+ *  Created on: 06 Aug 2023
  *      Author: JoergS5
  */
 
@@ -105,6 +105,7 @@ public:
 	int getPositionOfLetterInChain(char letter) const noexcept;
 	char getLetterInChain(int pos) const noexcept;
 
+	void multiplyTrmatrixWithVector(const float *mx, const float *vec, float *vecTo) const noexcept;
 
 	void initCache() const noexcept;
 	void setAxisTypes(const char* types) const noexcept;
@@ -147,6 +148,9 @@ public:
 			float *mx) const noexcept;
 	void getRodrigues2_Pris(float *screwOmega, float dist, float *_mxTemp) const noexcept;
 	int getRotaryIndex(int axisnr) const noexcept;
+	void getRodriguesByLetter(char drive, float theta, float *mx) const noexcept;
+	void getRodriguesByLetterInv(char drive, float theta, float *mxInv) const noexcept;
+	void removeMatrixNearZero(float *mxTemp) const noexcept;
 
 	// Paden-Kahan
 //	mutable float pk1cache[1][12]; // 1 * 12 * 4 bytes
@@ -231,6 +235,10 @@ public:
 	void getInverseBySkew(const float *mxTo, float *anglesResult, float cAngle) const noexcept;
 	void getInverseAC(const float *mxTo, float *anglesResult, float cAngle) const noexcept;
 	void getInverseCoreXY_XYZ(const float *mxTo, float *anglesResult, bool iscorexy) const noexcept;
+	void initNeutralMatrix(float *mx) const noexcept;
+
+	// GA methods
+	void GAcalculateRotor(const float *rotorC, const float *point, float *pointTo) const noexcept;
 
 
 protected:

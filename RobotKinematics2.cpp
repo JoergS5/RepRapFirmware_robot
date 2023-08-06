@@ -1,7 +1,7 @@
 /*
  * RobotKinematics2.cpp
  *
- *  Created on: 01 Aug 2023
+ *  Created on: 06 Aug 2023
  *      Author: JoergS5
  */
 
@@ -310,7 +310,7 @@ void RobotKinematics::getInverseBySkew(const float *mxTo, float *anglesTo, float
 
 void RobotKinematics::getInverseAC(const float *mxTo, float *anglesCA, float cAngle) const noexcept {
 
-	if(mxTo[2] == 0.0 && mxTo[6] == 0.0) {
+	if(mxTo[2] == 0.0 && mxTo[6] == 0.0) { // Z axis is vertical, i.e. A/B is 0
 		anglesCA[0] = cAngle;
 	}
 	else {
@@ -348,29 +348,32 @@ void RobotKinematics::getInverseCoreXY_XYZ(const float *mxTo, float *anglesResul
 
 	startClock();
 
-	// anglesResult 0 is C, 1 is A, already calculated
-	float anglesNew[5]; // order CAZXY
-	anglesNew[0] = anglesResult[0];
-	anglesNew[1] = anglesResult[1];
-	anglesNew[2] = mxTo[11];
-	anglesNew[3] = mxTo[3];
-	anglesNew[4] = mxTo[7];
-	float mxXYZ[12];
-	getForwardBySkew(anglesNew, mxXYZ);
+	// create matrix with correct orientation vectors and position from mxTo
+	float mxInitAC[12];
+	float mxC[12];
+	getRodriguesByLetter('C', anglesResult[0], mxC);
+	float mxA[12];
+	getRodriguesByLetter('A', anglesResult[1], mxA);
+	//multiplyRotationMatrix(mxA, mxC, mxInitAC);
+	multiplyRotationMatrix(mxC, mxA, mxInitAC);
+	mxInitAC[3] = mxTo[3];
+	mxInitAC[7] = mxTo[7];
+	mxInitAC[11] = mxTo[11];
 
-	anglesResult[2] = mxXYZ[11] - cache[offsetMreference+2]; // Z
-	if(iscorexy) {
-		float x = mxXYZ[3] - cache[offsetMreference+3];
-		float y = mxXYZ[7] - cache[offsetMreference+4];
-		anglesResult[3] = x + y;
-		anglesResult[4] = x - y;
-	}
-	else {
-		anglesResult[3] = mxXYZ[3] - cache[offsetMreference+3]; // X
-		anglesResult[4] = mxXYZ[7] - cache[offsetMreference+4]; // Y
-	}
+	// e-A e-C noap M-1 = eZ eY eX
+	float mxAinv[12];
+	rotationMatrixInverse(mxA, mxAinv);
+	float mxCinv[12];
+	rotationMatrixInverse(mxC, mxCinv);
+	multiplyRotationMatrix(mxAinv, mxCinv, mxTemp);
+	multiplyRotationMatrixInplaceLeft(mxTemp, mxInitAC);
+	multiplyRotationMatrixInplaceLeft(mxTemp, screw_MInv);
+
 	anglesResult[0] -= cache[offsetMreference]; //C
 	anglesResult[1] -= cache[offsetMreference+1]; //A
+	anglesResult[2] =  mxTemp[11] - cache[offsetMreference+2]; // Z
+	anglesResult[3] = mxTemp[3] - cache[offsetMreference+3]; // X
+	anglesResult[4] = mxTemp[7] - cache[offsetMreference+4]; // Y
 
 	sumOfTimes += stopClock();
 	timeMeasurements++;
@@ -391,14 +394,20 @@ void RobotKinematics::normalizeVector(float &x, float &y, float &z) const noexce
 /*
  * for inverse: translate G-Code into mx matrix (only z-axis and pos relevant)
  */
+
 void RobotKinematics::XYZACTomx(const float *xyzac, float *mx) const noexcept {
+	// rotation info:
+	getRodriguesByLetter('C', xyzac[4], mx);
+	getRodriguesByLetter('A', xyzac[3], mxTemp);
+	multiplyRotationMatrixInplaceLeft(mx, mxTemp);
+	// position info:
 	mx[3] = xyzac[0];
 	mx[7] = xyzac[1];
 	mx[11] = xyzac[2];
 
-	mx[2] = sinf(xyzac[3]/radiansToDegrees) * sinf(xyzac[4]/radiansToDegrees);
-	mx[6] = - cosf(xyzac[4]/radiansToDegrees) * sinf(xyzac[3]/radiansToDegrees);
-	mx[10] = cosf(xyzac[3]/radiansToDegrees);	// cA
+	//	mx[2] = sinf(xyzac[3]/radiansToDegrees) * sinf(xyzac[4]/radiansToDegrees);
+	//	mx[6] = cosf(xyzac[4]/radiansToDegrees) * sinf(xyzac[3]/radiansToDegrees);
+	//	mx[10] = cosf(xyzac[3]/radiansToDegrees);	// cA
 }
 
 /*
@@ -440,6 +449,123 @@ void RobotKinematics::mxToXYZBC(const float *mx, float *xyzbc, float cAngle) con
 	getInverseAC(mx, anglesCB, cAngle);
 	xyzbc[3] = anglesCB[1]; // B
 	xyzbc[4] = anglesCB[0]; // C
+}
+
+void RobotKinematics::getRodriguesByLetter(char drive, float theta, float *mx) const noexcept {
+	int pos = getPositionOfLetterInChain(drive);
+	if(axisTypes[pos] == 'R') {
+		int rotarynr = getRotaryIndex(pos);
+		getRodrigues2_Rot(&cache[pos*3 + offsetScrewOmega], &cache[pos*3+ offsetScrewQ],
+				&cache[rotarynr*12 + offsetScrewOmega2], &cache[rotarynr*3 + offsetScrewV],
+				(theta - cache[offsetMreference+pos]) / radiansToDegrees, mx);
+	}
+	else { // 'P'
+		getRodrigues2_Pris(&cache[pos*3+ offsetScrewOmega], theta - cache[offsetMreference+pos], mx);
+	}
+}
+
+void RobotKinematics::getRodriguesByLetterInv(char drive, float theta, float *mxInv) const noexcept {
+	getRodriguesByLetter(drive, theta, mxTemp);
+	rotationMatrixInverse(mxTemp, mxInv);
+}
+
+void RobotKinematics::removeMatrixNearZero(float *mx) const noexcept {
+	for(int i=0; i< 12; i++) {
+		if(abs(mx[i]) < 1e-6) {
+			mx[i] = 0.0;
+		}
+	}
+
+}
+
+void RobotKinematics::initNeutralMatrix(float *mx) const noexcept {
+	for(int i=0; i < 12; i++) {
+		if(i == 0 || i == 5 || i == 10) {
+			mx[i] = 1.0f;
+		}
+		else {
+			mx[i] = 0.0f;
+		}
+	}
+}
+
+/*
+ * mx is in 3x4 form, 4th colum will be ignored
+ * vec, vecTo are 3x1
+ */
+
+void RobotKinematics::multiplyTrmatrixWithVector(const float *mx, const float *vec, float *vecTo) const noexcept {
+	vecTo[0] = mx[0]*vec[0] + mx[1]*vec[1] + mx[2]*vec[2];
+	vecTo[1] = mx[4]*vec[0] + mx[5]*vec[1] + mx[6]*vec[2];
+	vecTo[2] = mx[8]*vec[0] + mx[9]*vec[1] + mx[10]*vec[2];
+}
+
+void RobotKinematics::GAcalculateRotor(const float *rotor, const float *pt, float *pointTo) const noexcept {
+	float temp1[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+
+	temp1[0] += rotor[0] * pt[0]; //rotor[0] * pt[0] s*e1 = +e1 [1]
+	temp1[1] += rotor[0] * pt[1]; //rotor[0] * pt[1] s*e2 = +e2 [2]
+	temp1[2] += rotor[0] * pt[2]; //rotor[0] * pt[2] s*e3 = +e3 [3]
+	temp1[3] += rotor[0] * pt[3]; //rotor[0] * pt[3] s*einf = +einf [4]
+	temp1[4] += rotor[0] * pt[4]; //rotor[0] * pt[4] s*eo = +eo [5]
+
+	temp1[1] += - rotor[1] * pt[0]; //rotor[1] * pt[0] e12*e1 = -e2
+	temp1[0] += rotor[1] * pt[1]; //rotor[1] * pt[1] e12*e2 = +e1
+	temp1[5] += rotor[1] * pt[2]; //rotor[1] * pt[2] e12*e3 = +e123
+	temp1[6] += rotor[1] * pt[3]; //rotor[1] * pt[3] e12*einf = +e12inf
+	temp1[7] += rotor[1] * pt[4]; //rotor[1] * pt[4] e12*eo = +e12o
+
+	temp1[2] += - rotor[2] * pt[0]; //rotor[2] * pt[0] e13*e1 = -e3
+	temp1[5] += - rotor[2] * pt[1]; //rotor[2] * pt[1] e13*e2 = -e123
+	temp1[0] += rotor[2] * pt[2]; //rotor[2] * pt[2] e13*e3 = +e1
+	temp1[8] += rotor[2] * pt[3]; //rotor[2] * pt[3] e13*einf = +e13inf
+	temp1[9] += rotor[2] * pt[4]; //rotor[2] * pt[4] e13*eo = +e13o
+
+	temp1[5] += rotor[3] * pt[0]; //rotor[3] * pt[0] e23*e1 = +e123
+	temp1[2] += - rotor[3] * pt[1]; //rotor[3] * pt[1] e23*e2 = -e3
+	temp1[1] += rotor[3] * pt[2]; //rotor[3] * pt[2] e23*e3 = +e2
+	temp1[10] += rotor[3] * pt[3]; //rotor[3] * pt[3] e23*einf = +e23inf
+	temp1[11] += rotor[3] * pt[4]; //rotor[3] * pt[4] e23*eo = +e23o
+
+	// temp1 * ~R => R*pt*~R, result in pointTo[5]
+	// pointTo contains e1 in [0] until eo in [4]
+
+	float reverseRotor[4] = {rotor[0], - rotor[1], - rotor[2], - rotor[3]}; // 0 s 6 e12 7 e13 10 e23
+	for(int i=0; i < 5; i++) pointTo[i] = 0.0;
+
+
+	pointTo[0] += temp1[0] * reverseRotor[0]; // e1 * s = e1
+	pointTo[1] += temp1[0] * reverseRotor[1]; // e1 * e12 = e2
+	pointTo[2] += temp1[0] * reverseRotor[2]; // e1 * e13 = e3
+
+	pointTo[1] += temp1[1] * reverseRotor[0]; // e2 * s = e2
+	pointTo[0] -= temp1[1] * reverseRotor[1]; // e2 * e12 = -e1
+	pointTo[2] += temp1[1] * reverseRotor[3]; // e2 * e23 = e3
+
+	pointTo[2] += temp1[2] * reverseRotor[0]; // e3 * s = e3
+	pointTo[0] -= temp1[2] * reverseRotor[2]; // e3 * e13 = -e1
+	pointTo[1] -= temp1[2] * reverseRotor[3]; // e3 * e23 = -e2
+
+	pointTo[3] += temp1[3] * reverseRotor[0]; // einf * s = einf
+
+	pointTo[4] += temp1[4] * reverseRotor[0]; // eo * s = eo
+
+	pointTo[2] -= temp1[5] * reverseRotor[1]; // e123 * e12 = -e3
+	pointTo[1] += temp1[5] * reverseRotor[2]; // e123 * e13 = e2
+	pointTo[0] -= temp1[5] * reverseRotor[3]; // e123 * e23 = -e1
+
+	pointTo[3] -= temp1[6] * reverseRotor[1]; // e12inf * e12 = -einf
+
+	pointTo[4] -= temp1[7] * reverseRotor[1]; // e12o * e12 = -eo
+
+	pointTo[3] -= temp1[8] * reverseRotor[2]; // e13inf * e13 = -einf
+
+	pointTo[4] -= temp1[9] * reverseRotor[2]; // e13o * e13 = -eo
+
+	pointTo[3] -= temp1[10] * reverseRotor[3]; // e23inf * e23 = -einf
+
+	pointTo[4] -= temp1[11] * reverseRotor[3]; // e23o * e23 = -eo
+
 }
 
 
