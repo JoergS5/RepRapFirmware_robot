@@ -110,12 +110,12 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 	float offAz = 0;
 	if(abcType == 0) {
 		int i = getPositionOfLetterInChain('A');
-		offAxy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ+1]; // y offset of A axis
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 	else if(abcType == 1) {
 		int i = getPositionOfLetterInChain('B');
-		offAxy = cache[i*3+ offsetScrewQ+0]; // x offset now
+		offAxy = cache[i*3+ offsetScrewQ]; // x offset of B axis
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 
@@ -210,12 +210,12 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	float offAz = 0;
 	if(abcType == 0) {
 		int i = getPositionOfLetterInChain('A');
-		offAxy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ+1]; // y value of A axis
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 	else if(abcType == 1) {
 		int i = getPositionOfLetterInChain('B');
-		offAxy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ]; // x value of B axis
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 
