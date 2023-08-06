@@ -106,16 +106,16 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 
 	//startClock();
 
-	float offAy = 0;
+	float offAxy = 0; // offset y for AC, x for BC
 	float offAz = 0;
 	if(abcType == 0) {
 		int i = getPositionOfLetterInChain('A');
-		offAy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ+1];
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 	else if(abcType == 1) {
 		int i = getPositionOfLetterInChain('B');
-		offAy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ+0]; // x offset now
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 
@@ -131,7 +131,13 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 	GAcalculateRotor(rotorC, point, point2); // ptTo=R*pt/R;
 
 	// translate by - A offsets:
-	float point3[5] = {point2[0], point2[1] - offAy, point2[2] - offAz, 0, 1};
+	float point3[5] = {point2[0], point2[1], point2[2] - offAz, 0, 1};
+	if(abcType == 0) {
+		point3[1] -= offAxy;
+	}
+	else if(abcType == 1) {
+		point3[0] -= offAxy;
+	}
 	point3[3] = 0.5 * (point3[0]*point3[0] + point3[1]*point3[1] + point3[2]*point3[2]);
 
 	// rotate by A, store in point4:
@@ -147,7 +153,13 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 	GAcalculateRotor(rotorA, point3, point4); // ptTo=R*pt/R;
 
 	// translate by - A offsets back:
-	float point5[5] = {point4[0], point4[1] + offAy, point4[2] + offAz, 0, 1};
+	float point5[5] = {point4[0], point4[1], point4[2] + offAz, 0, 1};
+	if(abcType == 0) {
+		point5[1] += offAxy;
+	}
+	else if(abcType == 1) {
+		point5[0] += offAxy;
+	}
 	point5[3] = 0.5 * (point5[0]*point5[0] + point5[1]*point5[1] + point5[2]*point5[2]);
 
 
@@ -194,21 +206,28 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	angles[4] = (float) motorPos[4] / stepsPerMm[4]; // C
 
 
-	float offAy = 0;
+	float offAxy = 0; // y offset for AC, x offset for BC
 	float offAz = 0;
 	if(abcType == 0) {
 		int i = getPositionOfLetterInChain('A');
-		offAy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ+1];
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 	else if(abcType == 1) {
 		int i = getPositionOfLetterInChain('B');
-		offAy = cache[i*3+ offsetScrewQ+1];
+		offAxy = cache[i*3+ offsetScrewQ+1];
 		offAz = cache[i*3+ offsetScrewQ+2];
 	}
 
 
-	float point2[5] = {angles[0], angles[1] - offAy, angles[2] - offAz, 0, 1};
+	float point2[5] = {angles[0], angles[1], angles[2] - offAz, 0, 1};
+	if(abcType == 0) {
+		point2[1] -= offAxy;
+	}
+	else if(abcType == 1) {
+		point2[0] -= offAxy;
+	}
+
 	point2[3] = 0.5 * (point2[0]*point2[0] + point2[1]*point2[1] + point2[2]*point2[2]);
 
 	// rotate negative A:
@@ -224,7 +243,13 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	GAcalculateRotor(rotorA, point2, point3); // ptTo=R*pt/R;
 
 	// translate by A offset back:
-	float point4[5] = {point3[0], point3[1] + offAy, point3[2] + offAz, 0, 1};
+	float point4[5] = {point3[0], point3[1], point3[2] + offAz, 0, 1};
+	if(abcType == 0) {
+		point4[1] += offAxy;
+	}
+	else if(abcType == 1) {
+		point4[0] += offAxy;
+	}
 	point4[3] = 0.5 * (point4[0]*point4[0] + point4[1]*point4[1] + point4[2]*point4[2]);
 
 	// rotate negative C:
