@@ -500,72 +500,26 @@ void RobotKinematics::multiplyTrmatrixWithVector(const float *mx, const float *v
 	vecTo[2] = mx[8]*vec[0] + mx[9]*vec[1] + mx[10]*vec[2];
 }
 
+/*
+ * rotate point by rotator (geometric algebra ptTo=R*pt*~R)
+ * rotor: 4 quaternion values, defining the rotation
+ * pt point with 5 values
+ * ~R reverse rotor
+ */
+
 void RobotKinematics::GAcalculateRotor(const float *rotor, const float *pt, float *pointTo) const noexcept {
-	float temp1[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+	temp4[0] = rotor[0] * pt[0] + rotor[1] * pt[1] + rotor[2] * pt[2];
+	temp4[1] = rotor[0] * pt[1] - rotor[1] * pt[0] + rotor[3] * pt[2];
+	temp4[2] = rotor[0] * pt[2] - rotor[2] * pt[0] - rotor[3] * pt[1];
+	temp4[3] = rotor[1] * pt[2] - rotor[2] * pt[1] + rotor[3] * pt[0];
 
-	temp1[0] += rotor[0] * pt[0]; //rotor[0] * pt[0] s*e1 = +e1 [1]
-	temp1[1] += rotor[0] * pt[1]; //rotor[0] * pt[1] s*e2 = +e2 [2]
-	temp1[2] += rotor[0] * pt[2]; //rotor[0] * pt[2] s*e3 = +e3 [3]
-	temp1[3] += rotor[0] * pt[3]; //rotor[0] * pt[3] s*einf = +einf [4]
-	temp1[4] += rotor[0] * pt[4]; //rotor[0] * pt[4] s*eo = +eo [5]
+	float revRot[4] = {rotor[0], - rotor[1], - rotor[2], - rotor[3]};
 
-	temp1[1] += - rotor[1] * pt[0]; //rotor[1] * pt[0] e12*e1 = -e2
-	temp1[0] += rotor[1] * pt[1]; //rotor[1] * pt[1] e12*e2 = +e1
-	temp1[5] += rotor[1] * pt[2]; //rotor[1] * pt[2] e12*e3 = +e123
-	temp1[6] += rotor[1] * pt[3]; //rotor[1] * pt[3] e12*einf = +e12inf
-	temp1[7] += rotor[1] * pt[4]; //rotor[1] * pt[4] e12*eo = +e12o
-
-	temp1[2] += - rotor[2] * pt[0]; //rotor[2] * pt[0] e13*e1 = -e3
-	temp1[5] += - rotor[2] * pt[1]; //rotor[2] * pt[1] e13*e2 = -e123
-	temp1[0] += rotor[2] * pt[2]; //rotor[2] * pt[2] e13*e3 = +e1
-	temp1[8] += rotor[2] * pt[3]; //rotor[2] * pt[3] e13*einf = +e13inf
-	temp1[9] += rotor[2] * pt[4]; //rotor[2] * pt[4] e13*eo = +e13o
-
-	temp1[5] += rotor[3] * pt[0]; //rotor[3] * pt[0] e23*e1 = +e123
-	temp1[2] += - rotor[3] * pt[1]; //rotor[3] * pt[1] e23*e2 = -e3
-	temp1[1] += rotor[3] * pt[2]; //rotor[3] * pt[2] e23*e3 = +e2
-	temp1[10] += rotor[3] * pt[3]; //rotor[3] * pt[3] e23*einf = +e23inf
-	temp1[11] += rotor[3] * pt[4]; //rotor[3] * pt[4] e23*eo = +e23o
-
-	// temp1 * ~R => R*pt*~R, result in pointTo[5]
-	// pointTo contains e1 in [0] until eo in [4]
-
-	float reverseRotor[4] = {rotor[0], - rotor[1], - rotor[2], - rotor[3]}; // 0 s 6 e12 7 e13 10 e23
-	for(int i=0; i < 5; i++) pointTo[i] = 0.0;
-
-
-	pointTo[0] += temp1[0] * reverseRotor[0]; // e1 * s = e1
-	pointTo[1] += temp1[0] * reverseRotor[1]; // e1 * e12 = e2
-	pointTo[2] += temp1[0] * reverseRotor[2]; // e1 * e13 = e3
-
-	pointTo[1] += temp1[1] * reverseRotor[0]; // e2 * s = e2
-	pointTo[0] -= temp1[1] * reverseRotor[1]; // e2 * e12 = -e1
-	pointTo[2] += temp1[1] * reverseRotor[3]; // e2 * e23 = e3
-
-	pointTo[2] += temp1[2] * reverseRotor[0]; // e3 * s = e3
-	pointTo[0] -= temp1[2] * reverseRotor[2]; // e3 * e13 = -e1
-	pointTo[1] -= temp1[2] * reverseRotor[3]; // e3 * e23 = -e2
-
-	pointTo[3] += temp1[3] * reverseRotor[0]; // einf * s = einf
-
-	pointTo[4] += temp1[4] * reverseRotor[0]; // eo * s = eo
-
-	pointTo[2] -= temp1[5] * reverseRotor[1]; // e123 * e12 = -e3
-	pointTo[1] += temp1[5] * reverseRotor[2]; // e123 * e13 = e2
-	pointTo[0] -= temp1[5] * reverseRotor[3]; // e123 * e23 = -e1
-
-	pointTo[3] -= temp1[6] * reverseRotor[1]; // e12inf * e12 = -einf
-
-	pointTo[4] -= temp1[7] * reverseRotor[1]; // e12o * e12 = -eo
-
-	pointTo[3] -= temp1[8] * reverseRotor[2]; // e13inf * e13 = -einf
-
-	pointTo[4] -= temp1[9] * reverseRotor[2]; // e13o * e13 = -eo
-
-	pointTo[3] -= temp1[10] * reverseRotor[3]; // e23inf * e23 = -einf
-
-	pointTo[4] -= temp1[11] * reverseRotor[3]; // e23o * e23 = -eo
-
+	pointTo[0] = temp4[0] * revRot[0] - temp4[1] * revRot[1] - temp4[2] * revRot[2] - temp4[3] * revRot[3];
+	pointTo[1] = temp4[0] * revRot[1] + temp4[1] * revRot[0] - temp4[2] * revRot[3] + temp4[3] * revRot[2];
+	pointTo[2] = temp4[0] * revRot[2] + temp4[1] * revRot[3] + temp4[2] * revRot[0] - temp4[3] * revRot[1];
+	pointTo[3] = 0.5 * (pointTo[0]*pointTo[0] + pointTo[1]*pointTo[1] + pointTo[2]*pointTo[2]);
+	pointTo[4] = 1.0;
 }
 
 
