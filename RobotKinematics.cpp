@@ -54,29 +54,34 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 	{
 		bool seen = false;
 		bool allowEmpty = false;
+		bool letterUsed = false;
 
 		if (gb.Seen('B')) {
 			gb.TryGetQuotedString('B', tempS50.GetRef(), seen, allowEmpty);
 			setB(tempS50.c_str());
-			seen = true;
+			seen = true; // => unhome
+			letterUsed = true;
 		}
 
 		if (gb.Seen('A')) {
 			gb.TryGetQuotedString('A', tempS50.GetRef(), seen, allowEmpty);
 			setA(tempS50.c_str());
-			seen = true;
+			seen = false; // => don't unhome
+			letterUsed = true;
 		}
 
 		if (gb.Seen('P')) {
 			gb.TryGetQuotedString('P', tempS50.GetRef(), seen, allowEmpty);
 			setP(tempS50.c_str());
-			seen = true;
+			seen = true; // => unhome
+			letterUsed = true;
 		}
 
 		if (gb.Seen('C')) {
 			gb.TryGetQuotedString('C', tempS50.GetRef(), seen, allowEmpty);
 			setC(tempS50.c_str());
-			seen = true;
+			seen = true; // => unhome
+			letterUsed = true;
 		}
 
 		if (gb.Seen('R')) {
@@ -86,10 +91,12 @@ bool RobotKinematics::Configure(unsigned int mCode, GCodeBuffer& gb, const Strin
 			consoleMessage(tempS50.GetRef());
 			tempS50.copy("\n");
 			consoleMessage(tempS50.GetRef());
-			seen = true;
+			sumOfTimes = 0;
+			timeMeasurements = 0;
+			letterUsed = true;
 		}
 
-		if(!seen) {
+		if(!letterUsed) {
 			reportConfiguration(gb);
 		}
 
@@ -128,17 +135,18 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 	rotorC[0] = cosf(angleC / 2.0);
 	rotorC[1] = -sinf(angleC / 2.0); // Z and X with minus sign
 	float point2[5];
-	GAcalculateRotor(rotorC, point, point2); // ptTo=R*pt/R;
+	GAcalculateRotor(rotorC, point, point2, false); // ptTo=R*pt/R;
 
 	// translate by - A offsets:
-	float point3[5] = {point2[0], point2[1], point2[2] - offAz, 0, 1};
+	point2[2] -= offAz;
+	//float point3[5] = {point2[0], point2[1], point2[2] - offAz, 0, 1};
 	if(abcType == 0) {
-		point3[1] -= offAxy;
+		point2[1] -= offAxy;
 	}
 	else if(abcType == 1) {
-		point3[0] -= offAxy;
+		point2[0] -= offAxy;
 	}
-	point3[3] = 0.5 * (point3[0]*point3[0] + point3[1]*point3[1] + point3[2]*point3[2]);
+	point2[3] = 0.5 * (point2[0]*point2[0] + point2[1]*point2[1] + point2[2]*point2[2]);
 
 	// rotate by A, store in point4:
 	float angleA = machinePos[3] / radiansToDegrees; // angle / 360 * 2 * pi
@@ -150,28 +158,27 @@ bool RobotKinematics::CartesianToMotorSteps(const float machinePos[], const floa
 		rotorA[2] = sinf(angleA / 2.0); // Y direction
 	}
 	float point4[5];
-	GAcalculateRotor(rotorA, point3, point4); // ptTo=R*pt/R;
+	GAcalculateRotor(rotorA, point2, point4, false); // ptTo=R*pt/R;
 
-	// translate by - A offsets back:
-	float point5[5] = {point4[0], point4[1], point4[2] + offAz, 0, 1};
+	// translate back A offsets:
+	point4[2] += offAz;
 	if(abcType == 0) {
-		point5[1] += offAxy;
+		point4[1] += offAxy;
 	}
 	else if(abcType == 1) {
-		point5[0] += offAxy;
+		point4[0] += offAxy;
 	}
-	point5[3] = 0.5 * (point5[0]*point5[0] + point5[1]*point5[1] + point5[2]*point5[2]);
+	// calculation of [3] distance not needed because we're finished
 
-
-	float coreX = point5[0];
-	float coreY = point5[1];
+	float coreX = point4[0];
+	float coreY = point4[1];
 	if(specialMethod == 1) { // CoreXY
-		coreX = point5[0] + point5[1];
-		coreY = point5[0] - point5[1];
+		coreX = point4[0] + point4[1];
+		coreY = point4[0] - point4[1];
 	}
 	motorPos[0] = lrintf(coreX * stepsPerMm[0]); // X (A stepper)
 	motorPos[1] = lrintf(coreY * stepsPerMm[1]); // Y (B stepper)
-	motorPos[2] = lrintf(point5[2] * stepsPerMm[2]); // Z
+	motorPos[2] = lrintf(point4[2] * stepsPerMm[2]); // Z
 	motorPos[3] = lrintf(machinePos[3] * stepsPerMm[3]); // A/B
 	motorPos[4] = lrintf(machinePos[4] * stepsPerMm[4]); // C
 
@@ -227,7 +234,6 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 	else if(abcType == 1) {
 		point2[0] -= offAxy;
 	}
-
 	point2[3] = 0.5 * (point2[0]*point2[0] + point2[1]*point2[1] + point2[2]*point2[2]);
 
 	// rotate negative A:
@@ -240,27 +246,27 @@ void RobotKinematics::MotorStepsToCartesian(const int32_t motorPos[], const floa
 		rotorA[2] = sinf(-angleA / 2.0); // Y direction
 	}
 	float point3[5];
-	GAcalculateRotor(rotorA, point2, point3); // ptTo=R*pt/R;
+	GAcalculateRotor(rotorA, point2, point3, false); // ptTo=R*pt/R;
 
 	// translate by A offset back:
-	float point4[5] = {point3[0], point3[1], point3[2] + offAz, 0, 1};
+	point3[2] += offAz;
 	if(abcType == 0) {
-		point4[1] += offAxy;
+		point3[1] += offAxy;
 	}
 	else if(abcType == 1) {
-		point4[0] += offAxy;
+		point3[0] += offAxy;
 	}
-	point4[3] = 0.5 * (point4[0]*point4[0] + point4[1]*point4[1] + point4[2]*point4[2]);
+	point3[3] = 0.5 * (point3[0]*point3[0] + point3[1]*point3[1] + point3[2]*point3[2]);
 
 	// rotate negative C:
 	float angleC = angles[4] / radiansToDegrees; // angle / 360 * 2 * pi
 	float rotorC[4] = {cosf(-angleC / 2.0), - sinf(-angleC / 2.0), 0, 0};	// 0, 6, 7, 10 cos/z/y/x
-	float point5[5];
-	GAcalculateRotor(rotorC, point4, point5); // ptTo=R*pt/R;
+	//float point5[5];
+	GAcalculateRotor(rotorC, point3, machinePos, false); // ptTo=R*pt/R;
 
-	machinePos[0] = point5[0];
-	machinePos[1] = point5[1];
-	machinePos[2] = point5[2];
+//	machinePos[0] = point5[0];
+//	machinePos[1] = point5[1];
+//	machinePos[2] = point5[2];
 	machinePos[3] = angles[3];
 	machinePos[4] = angles[4];
 

@@ -505,20 +505,29 @@ void RobotKinematics::multiplyTrmatrixWithVector(const float *mx, const float *v
  * rotor: 4 quaternion values, defining the rotation
  * pt point with 5 values
  * ~R reverse rotor
+ * calculateDistance: 3th array element only calculated if needed
  */
 
-void RobotKinematics::GAcalculateRotor(const float *rotor, const float *pt, float *pointTo) const noexcept {
+void RobotKinematics::GAcalculateRotor(const float *rotor, const float *pt, float *pointTo,
+		bool calculateDistance) const noexcept {
+	// R * pt
+
 	temp4[0] = rotor[0] * pt[0] + rotor[1] * pt[1] + rotor[2] * pt[2];
 	temp4[1] = rotor[0] * pt[1] - rotor[1] * pt[0] + rotor[3] * pt[2];
 	temp4[2] = rotor[0] * pt[2] - rotor[2] * pt[0] - rotor[3] * pt[1];
 	temp4[3] = rotor[1] * pt[2] - rotor[2] * pt[1] + rotor[3] * pt[0];
 
-	float revRot[4] = {rotor[0], - rotor[1], - rotor[2], - rotor[3]};
+	// * ~R: ( ~R is rotor[0], -rotor[1], -rotor[2], -rotor[3] )
 
-	pointTo[0] = temp4[0] * revRot[0] - temp4[1] * revRot[1] - temp4[2] * revRot[2] - temp4[3] * revRot[3];
-	pointTo[1] = temp4[0] * revRot[1] + temp4[1] * revRot[0] - temp4[2] * revRot[3] + temp4[3] * revRot[2];
-	pointTo[2] = temp4[0] * revRot[2] + temp4[1] * revRot[3] + temp4[2] * revRot[0] - temp4[3] * revRot[1];
-	pointTo[3] = 0.5 * (pointTo[0]*pointTo[0] + pointTo[1]*pointTo[1] + pointTo[2]*pointTo[2]);
+	pointTo[0] = temp4[0] * rotor[0] + temp4[1] * rotor[1] + temp4[2] * rotor[2] + temp4[3] * rotor[3];
+	pointTo[1] = - temp4[0] * rotor[1] + temp4[1] * rotor[0] + temp4[2] * rotor[3] - temp4[3] * rotor[2];
+	pointTo[2] = - temp4[0] * rotor[2] - temp4[1] * rotor[3] + temp4[2] * rotor[0] + temp4[3] * rotor[1];
+	if(calculateDistance) {
+		pointTo[3] = 0.5 * (pointTo[0]*pointTo[0] + pointTo[1]*pointTo[1] + pointTo[2]*pointTo[2]);
+	}
+	else {
+		pointTo[3] = 0.0;
+	}
 	pointTo[4] = 1.0;
 }
 

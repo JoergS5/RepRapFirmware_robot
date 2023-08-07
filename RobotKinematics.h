@@ -238,7 +238,7 @@ public:
 	void initNeutralMatrix(float *mx) const noexcept;
 
 	// GA methods
-	void GAcalculateRotor(const float *rotorC, const float *point, float *pointTo) const noexcept;
+	void GAcalculateRotor(const float *rotorC, const float *point, float *pointTo, bool calculateDist) const noexcept;
 
 
 protected:
