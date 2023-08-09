@@ -238,7 +238,11 @@ public:
 	void initNeutralMatrix(float *mx) const noexcept;
 
 	// GA methods
-	void GAcalculateRotor(const float *rotorC, const float *point, float *pointTo, bool calculateDist) const noexcept;
+	void GACartesianToMotor(const float *cartXYZAC, const float *ABpt, const float *Cpt, float *motor_xyz,
+			bool isAC) const noexcept;
+	void GAMotorToCartesian(const float *motor_xyzac, const float *ABpt, const float *Cpt,
+			float *cartXYZAC, bool isAC) const noexcept;
+	void GAcalculateRotorInplace(const float *rotor, float *point) const noexcept;
 
 
 protected:

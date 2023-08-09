@@ -501,15 +501,14 @@ void RobotKinematics::multiplyTrmatrixWithVector(const float *mx, const float *v
 }
 
 /*
- * rotate point by rotator (geometric algebra ptTo=R*pt*~R)
- * rotor: 4 quaternion values, defining the rotation
- * pt point with 5 values
- * ~R reverse rotor
- * calculateDistance: 3th array element only calculated if needed
+ * calculate rotation by 0,0,0
+ *
+ * rotor order of parameters: cos, - sin z, sin y, - sin x
+ *
+ * pt[3] and pt[4] are not used and omitted => array size 3 possible
  */
 
-void RobotKinematics::GAcalculateRotor(const float *rotor, const float *pt, float *pointTo,
-		bool calculateDistance) const noexcept {
+void RobotKinematics::GAcalculateRotorInplace(const float *rotor, float *pt) const noexcept {
 	// R * pt
 
 	temp4[0] = rotor[0] * pt[0] + rotor[1] * pt[1] + rotor[2] * pt[2];
@@ -517,18 +516,82 @@ void RobotKinematics::GAcalculateRotor(const float *rotor, const float *pt, floa
 	temp4[2] = rotor[0] * pt[2] - rotor[2] * pt[0] - rotor[3] * pt[1];
 	temp4[3] = rotor[1] * pt[2] - rotor[2] * pt[1] + rotor[3] * pt[0];
 
-	// * ~R: ( ~R is rotor[0], -rotor[1], -rotor[2], -rotor[3] )
+	// * ~R:
 
-	pointTo[0] = temp4[0] * rotor[0] + temp4[1] * rotor[1] + temp4[2] * rotor[2] + temp4[3] * rotor[3];
-	pointTo[1] = - temp4[0] * rotor[1] + temp4[1] * rotor[0] + temp4[2] * rotor[3] - temp4[3] * rotor[2];
-	pointTo[2] = - temp4[0] * rotor[2] - temp4[1] * rotor[3] + temp4[2] * rotor[0] + temp4[3] * rotor[1];
-	if(calculateDistance) {
-		pointTo[3] = 0.5 * (pointTo[0]*pointTo[0] + pointTo[1]*pointTo[1] + pointTo[2]*pointTo[2]);
+	pt[0] = temp4[0] * rotor[0] + temp4[1] * rotor[1] + temp4[2] * rotor[2] + temp4[3] * rotor[3];
+	pt[1] = - temp4[0] * rotor[1] + temp4[1] * rotor[0] + temp4[2] * rotor[3] - temp4[3] * rotor[2];
+	pt[2] = - temp4[0] * rotor[2] - temp4[1] * rotor[3] + temp4[2] * rotor[0] + temp4[3] * rotor[1];
+}
+
+void RobotKinematics::GAMotorToCartesian(const float *motor_xyzac, const float *ABpt, const float *Cpt,
+		float *cartXYZAC_0, bool isAC) const noexcept {
+
+	float point[3] = {motor_xyzac[0] - ABpt[0], motor_xyzac[1] - ABpt[1], motor_xyzac[2] - ABpt[2]};
+
+	// rotate negative A:
+	float angleA = motor_xyzac[3] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorA[4] = {cosf(-angleA / 2.0), 0, 0, 0};	// order zyx. by X, Z is negative, Y is positive sin
+	if(isAC) { // AC axis direction 1,0,0
+		rotorA[3] = - sinf(-angleA / 2.0); // X direction
 	}
-	else {
-		pointTo[3] = 0.0;
+	else { // BC, other axis direction 0,1,0
+		rotorA[2] = sinf(-angleA / 2.0); // Y direction
 	}
-	pointTo[4] = 1.0;
+	GAcalculateRotorInplace(rotorA, point); // ptTo=R*pt/R;
+
+	// translate A back and C forward:
+	point[0] += (ABpt[0] - Cpt[0]);
+	point[1] += (ABpt[1] - Cpt[1]);
+	point[2] += (ABpt[2] - Cpt[2]);
+
+	// rotate negative C:
+	float angleC = motor_xyzac[4] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorC[4] = {cosf(-angleC / 2.0), - sinf(-angleC / 2.0), 0, 0};	// 0, 6, 7, 10 cos/z/y/x
+	GAcalculateRotorInplace(rotorC, point); // ptTo=R*pt/R;
+
+	cartXYZAC_0[0] = point[0] + Cpt[0]; // translate C back
+	cartXYZAC_0[1] = point[1] + Cpt[1]; // translate C back
+	cartXYZAC_0[2] = point[2] + Cpt[2]; // translate C back
+	cartXYZAC_0[3] = motor_xyzac[3];
+	cartXYZAC_0[4] = motor_xyzac[4];
+
+}
+
+void RobotKinematics::GACartesianToMotor(const float *cartXYZAC, const float *ABpt, const float *Cpt, float *motor_xyz,
+		bool isAC) const noexcept {
+
+	// translate by C offset
+	float point[3] = {cartXYZAC[0] - Cpt[0], cartXYZAC[1] - Cpt[1], cartXYZAC[2] - Cpt[2]};
+
+	// rotate by C
+	float angleC = cartXYZAC[4] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorC[4] = {0,0,0,0};	// 	// by X, Z is negative, Y is positive sin
+	rotorC[0] = cosf(angleC / 2.0);
+	rotorC[1] = -sinf(angleC / 2.0); // Z and X with minus sign
+	GAcalculateRotorInplace(rotorC, point); // ptTo=R*pt/R;
+
+	// translate C offsets back, A offsets:
+	point[0] += (Cpt[0] - ABpt[0]);
+	point[1] += (Cpt[1] - ABpt[1]);
+	point[2] += (Cpt[2] - ABpt[2]);
+
+	// rotate by A, store in point4:
+	float angleA = cartXYZAC[3] / radiansToDegrees; // angle / 360 * 2 * pi
+	float rotorA[4] = {cosf(angleA / 2.0), 0, 0, 0};	// 0, 6, 7, 10 cos/z/y/x
+	if(isAC) { // AC
+		rotorA[3] = - sinf(angleA / 2.0); // X direction
+	}
+	else { // BC
+		rotorA[2] = sinf(angleA / 2.0); // Y direction
+	}
+	GAcalculateRotorInplace(rotorA, point); // ptTo=R*pt/R;
+
+	motor_xyz[0] = point[0] + ABpt[0]; // translate A back
+	motor_xyz[1] = point[1] + ABpt[1]; // translate A back
+	motor_xyz[2] = point[2] + ABpt[2]; // translate A back
+	motor_xyz[3] = cartXYZAC[3];
+	motor_xyz[4] = cartXYZAC[4];
+
 }
 
 
